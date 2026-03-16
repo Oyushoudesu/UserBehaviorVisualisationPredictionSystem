@@ -1,0 +1,30 @@
+{
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "python-envs.pythonProjects": [],
+    "github.copilot.chat.languageContext.inline.typescript.enabled": true,
+    "github.copilot.chat.copilotMemory.enabled": true,
+    "cSpell.words": [
+        "annot",
+        "Axios",
+        "barplot",
+        "bytree",
+        "cmap",
+        "colsample",
+        "curveness",
+        "darkorange",
+        "dayofweek",
+        "echarts",
+        "importances",
+        "linestyle",
+        "Mechant",
+        "proba",
+        "sankey",
+        "topbar",
+        "uniaque",
+        "viridis",
+        "Vuex",
+        "yticklabels",
+        "yticks"
+    ],
+    "python.languageServer": "None"
+}
