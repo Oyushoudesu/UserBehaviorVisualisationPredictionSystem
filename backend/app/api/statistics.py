@@ -7,7 +7,7 @@
 
 from fastapi import APIRouter, HTTPException
 import pandas as pd
-
+from app.services.data_cache import GLOBAL_DF_CACHE
 router = APIRouter()
 
 # ============================================================================
@@ -27,7 +27,7 @@ def get_user_stats(user_id: str):
     try:
         # 加载用户特征数据
         # 优化数据访问，直接引用全局内存中的DataFrame
-        features = GLOBAL_DATA.get("features_m4")
+        features = GLOBAL_DF_CACHE.get("features", {}).get(4)
         if features is None:
             raise HTTPException(status_code=500, detail="特征数据未加载或加载失败")
         
@@ -65,7 +65,7 @@ def get_top_users(metric: str = "total_purchases", top_n: int = 10):
     返回：Top用户列表
     """
     try:
-        features = GLOBAL_DATA.get("features_m4")
+        features = GLOBAL_DF_CACHE.get("features", {}).get(4)
         if features is None:
             raise HTTPException(status_code=500, detail="特征数据未加载或加载失败")
         
@@ -104,7 +104,7 @@ def get_merchant_ranking(top_n: int = 20):
     """
     try:
         # 加载原始数据
-        df = GLOBAL_DATA.get("raw_data")
+        df = GLOBAL_DF_CACHE.get("raw_data")
         if df is None:
             raise HTTPException(status_code=500, detail="数据未加载或加载失败")
         df = df.copy()
@@ -139,7 +139,7 @@ def get_repurchase_rate():
     返回：4/5/6月的复购率
     """
     try:
-        df = GLOBAL_DATA.get("raw_data")
+        df = GLOBAL_DF_CACHE.get("raw_data")
         if df is None:
             raise HTTPException(status_code=500, detail="数据未加载或加载失败")
         df = df.copy()

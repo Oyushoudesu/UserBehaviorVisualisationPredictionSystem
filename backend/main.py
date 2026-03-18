@@ -7,6 +7,25 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+from contextlib import asynccontextmanager
+# 导入你的路由和缓存初始化函数
+from app.api import visualization, statistics, prediction
+from app.services.data_cache import init_global_cache, API_RESULT_CACHE, GLOBAL_DF_CACHE
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    应用生命周期管理 - 
+    1、启动时加载数据到内存；
+    2、关闭时清理缓存。
+    """
+    print("加载数据到内存...")
+    init_global_cache()  # 初始化全局缓存
+    print("数据加载完成，API已准备好")
+    yield  # 接受请求
+    API_RESULT_CACHE.clear()
+    GLOBAL_DF_CACHE["features"].clear()
+    print("应用关闭,缓存已清理")
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -23,6 +42,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 注册路由
+app.include_router(visualization.router, prefix="/api/v1/visualization", tags=["可视化"])
+app.include_router(prediction.router, prefix="/api/v1/prediction", tags=["预测"])
+app.include_router(statistics.router, prefix="/api/v1/statistics", tags=["统计"])
 
 # ============================================================================
 # 健康检查接口

@@ -10,20 +10,23 @@ import os
 # 全局结果缓存字典
 API_RESULT_CACHE = {}
 
+# 全局 DataFrame 缓存（用于预测接口和散点图采样）
+GLOBAL_DF_CACHE = {
+    "features": {} # 存储不同月份的用户特征表： {4: df4, 5: df5, 6: df6 }
+}
+
 # 基础预计算函数
 def compute_overview(df):
     '''预计算概览数据'''
-    total_users = df['user_id'].nunique()
-    total_purchases = df['purchase_amount'].sum()
-    # 计算核心指标
     # 使用 nunique() 计算去重后的独立用户数和商户数
     total_users = df['user_id'].nunique()
     total_merchants = df['merchant_id'].nunique()
+    
     # 统计非空的日期字段数量，代表实际发生的购买次数和发券次数
     total_purchases = df['date'].notna().sum()
     total_coupons = df['date_received'].notna().sum()
+    
     # 计算整体转化率 CVR (Conversion Rate)
-    # 假设 'action' 列中 0 代表点击，1 代表购买
     if 'action' in df.columns:
         clicks = (df['action'] == 0).sum()
         purchases = (df['action'] == 1).sum()
@@ -32,11 +35,8 @@ def compute_overview(df):
         cvr = 0
     
     # 计算优惠券核销率
-    # 已核销：有购买时间且有优惠券ID
     coupon_used = ((df['date'].notna()) & (df['coupon_id'].notna())).sum()
-    # 未核销：date为空且coupon_id不为空
     coupon_not_used = ((df['date'].isna()) & (df['coupon_id'].notna())).sum()
-    # 核销率 = 已核销 / (已核销 + 未核销)
     redemption_rate = (coupon_used / (coupon_used + coupon_not_used) * 100) if (coupon_used + coupon_not_used) > 0 else 0
 
     return {
@@ -134,11 +134,13 @@ def compute_behavior_heatmap(df, month):
     if 'hour' in month_df.columns:
         month_df['hour'] = month_df['hour'].astype(int)
     else:
-        # 模拟数据
+        # 模拟数据：自动将概率归一化，确保总和绝对等于 1
         np.random.seed(42)
-        hours = np.random.choice(range(24), size=len(month_df), 
-                                 p=[0.01,0.01,0.01,0.01,0.01,0.02,0.03,0.05,0.07,0.08,0.07,0.06,
-                                    0.05,0.05,0.05,0.05,0.06,0.07,0.08,0.07,0.06,0.05,0.03,0.02])
+        raw_p = [0.01,0.01,0.01,0.01,0.01,0.02,0.03,0.05,0.07,0.08,0.07,0.06,
+                 0.05,0.05,0.05,0.05,0.06,0.07,0.08,0.07,0.06,0.05,0.03,0.02]
+        normalized_p = np.array(raw_p) / sum(raw_p)
+        
+        hours = np.random.choice(range(24), size=len(month_df), p=normalized_p)
         month_df['hour'] = hours
 
     month_df['weekday'] = month_df['date'].dt.weekday
@@ -193,14 +195,19 @@ def init_global_cache():
         print("加载原始数据集")
         df = pd.read_csv(raw_path)
         df.columns = df.columns.str.lower()
-        df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d',errors='coerce')
-        df['date_received'] = pd.to_datetime(df['date_received'], format='%Y-%m-%d',errors='coerce')
+        df['date'] = pd.to_datetime(df['date'], format='%Y%m%d',errors='coerce')
+        df['date_received'] = pd.to_datetime(df['date_received'], format='%Y%m%d',errors='coerce')
         df['month'] = df['date'].dt.month
         
         # 宽表级别缓存聚合
+        GLOBAL_DF_CACHE['raw_data'] = df
         API_RESULT_CACHE['overview'] = compute_overview(df)
         API_RESULT_CACHE['daily_trend'] = compute_daily_trend(df)
-        API_RESULT_CACHE['monthly_stats'] = compute_monthly_stats(df)
+        if 'compute_monthly_stats' in globals():
+            API_RESULT_CACHE['monthly_stats'] = compute_monthly_stats(df)
+        elif 'compute_monthly_trend' in globals():
+            API_RESULT_CACHE['monthly_stats'] = compute_monthly_trend(df)
+        
         API_RESULT_CACHE['conversion_funnel'] = compute_conversion_funnel(df)
         # 按参数/时间段嵌套缓存
         API_RESULT_CACHE['behavior_sankey'] = {
@@ -212,8 +219,6 @@ def init_global_cache():
         API_RESULT_CACHE['behavior_heatmap'] = {}
         for m in [4,5,6]:
             API_RESULT_CACHE['behavior_heatmap'][m] = compute_behavior_heatmap(df, month=m)
-            # 释放宽表内存
-        del df
     else:
         print("原始数据文件未找到")
 
@@ -226,14 +231,18 @@ def init_global_cache():
         feat_path = f'data/features/user_features_month{month}.csv'
         if os.path.exists(feat_path):
             features = pd.read_csv(feat_path)
+            # 存入全局 DF 缓存
+            GLOBAL_DF_CACHE["features"][month] = features
+            
             # 执行按月的特征相关预计算
             API_RESULT_CACHE['user_stats'][month] = compute_user_stats(features)
-            API_RESULT_CACHE['user_segmentation'][month] = compute_user_segmentation(features)
+            if 'compute_user_segmentation' in globals():
+                API_RESULT_CACHE['user_segmentation'][month] = compute_user_segmentation(features)
             API_RESULT_CACHE['group_conversion'][month] = compute_group_conversion(features)
             
-            # 注意：像 user_rfm (散点图) 这种需要返回几千个明细点的，
+            
             # 也可以在这里采样并缓存，逻辑与上面类似。
-            del features
         else:
             print(f"特征数据文件 {feat_path} 未找到")
 
+init_global_cache()

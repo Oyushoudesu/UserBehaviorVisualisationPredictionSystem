@@ -12,12 +12,13 @@ import pandas as pd
 import pickle
 import numpy as np
 
+# 引入在 data_cache.py 中定义好的全局特征缓存
+from app.services.data_cache import GLOBAL_DF_CACHE
 router = APIRouter()
 
 # ============================================================================
 # 请求/响应模型
 # ============================================================================
-
 class PredictionRequest(BaseModel):
     """预测请求"""
     user_ids: List[str]
@@ -33,7 +34,6 @@ class PredictionResponse(BaseModel):
 # ============================================================================
 # 加载模型（启动时加载）
 # ============================================================================
-
 models = {
     "regular": {},
     "promotion": {}
@@ -59,6 +59,7 @@ def load_models():
         print(f"模型加载失败: {e}")
 
 # 应用启动时加载模型
+# 注意：这行代码会在此文件被导入时自动执行
 load_models()
 
 # ============================================================================
@@ -90,18 +91,16 @@ def predict_repurchase(request: PredictionRequest):
             detail="模型未加载，请稍后重试"
         )
     
-    # 加载特征数据
-    try:
-        # 根据模型类型选择特征数据
-        if request.model_type == "regular":
-            features_df = pd.read_csv('data/features/user_features_month4.csv')
-        else:
-            features_df = pd.read_csv('data/features/user_features_month6.csv')
-    except Exception as e:
+    # 直接从内存缓存中获取特征数据
+    month_key = 4 if request.model_type == "regular" else 6
+    features_df = GLOBAL_DF_CACHE.get("features", {}).get(month_key)
+    
+    if features_df is None:
         raise HTTPException(
-            status_code=404, 
-            detail=f"特征数据加载失败: {str(e)}"
+            status_code=503, 
+            detail=f"内存中未找到 {month_key} 月的特征数据，请检查缓存初始化"
         )
+        
     # 筛选指定用户
     features_df['user_id'] = features_df['user_id'].astype(str)
     user_features = features_df[features_df['user_id'].isin(request.user_ids)]
@@ -164,20 +163,21 @@ def get_batch_prediction_stats(model_type: str = "regular"):
     """
     # 加载特征数据
     # 优化数据访问，直接引用全局内存中的DataFrame
-    try:
-        if model_type == "regular":
-            features_df = GLOBAL_DATA.get("features_m5")
-        else:
-            features_df = GLOBAL_DATA.get("features_m6")
-        if features_df is None:
-            raise HTTPException(status_code=500, detail="特征数据未加载或加载失败")
-    except:
-        raise HTTPException(status_code=404, detail="特征数据未找到")
+    # 同样从内存缓存中获取特征数据
+    month_key = 5 if model_type == "regular" else 6
+    features_df = GLOBAL_DF_CACHE.get("features", {}).get(month_key)
+    
+    if features_df is None:
+        raise HTTPException(status_code=404, detail=f"内存中未找到 {month_key} 月特征数据")
     
     # 准备特征
     feature_cols = [col for col in features_df.columns 
                    if col not in ['user_id', 'label']]
     X = features_df[feature_cols]
+    
+    if 'label' not in features_df.columns:
+        raise HTTPException(status_code=500, detail="特征数据中缺少真实的 label 列，无法计算评估指标")
+        
     y_true = features_df['label']
     
     # 预测
@@ -224,19 +224,24 @@ def get_feature_importance(model_type: str = "regular", top_n: int = 20):
     # 获取XGBoost模型的特征重要性
     xgb_model = models[model_type]["xgb"]
     
-    # 获取特征名
-    try:
-        features_df = GLOBAL_DATA.get("features_m4")
-        if features_df is None:
-            raise HTTPException(status_code=500, detail="特征数据未加载或加载失败")
-        feature_cols = [col for col in features_df.columns 
-                       if col not in ['user_id', 'label']]
-    except:
-        raise HTTPException(status_code=404, detail="特征数据未找到")
+    # 从内存获取特征名
+    features_df = GLOBAL_DF_CACHE.get("features", {}).get(4)
+    if features_df is None:
+        raise HTTPException(status_code=404, detail="内存中未找到特征数据用于提取字段名")
+        
+    feature_cols = [col for col in features_df.columns 
+                   if col not in ['user_id', 'label']]
     
     # 特征重要性
     importance = xgb_model.feature_importances_
     
+    # 长度校验，防止因特征工程更新导致模型特征维度与表格不一致报错
+    if len(feature_cols) != len(importance):
+         raise HTTPException(
+             status_code=500, 
+             detail=f"模型特征维度 ({len(importance)}) 与当前表格特征数 ({len(feature_cols)}) 不匹配！"
+         )
+         
     # 创建DataFrame并排序
     importance_df = pd.DataFrame({
         'feature': feature_cols,
