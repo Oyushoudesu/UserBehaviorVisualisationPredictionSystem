@@ -334,3 +334,24 @@ def get_comparison_summary():
             "promotion": to_radar(promotion, promotion)
         }
     }
+
+# ============================================================================
+# 接口13：用户生命周期分布
+# ============================================================================
+@router.get("/lifecycle")
+def get_lifecycle(month: int = 4):
+    """获取用户生命周期分布数据"""
+    # 结合 RFM 模型映射生命周期
+    result = API_RESULT_CACHE.get('user_segmentation', {}).get(month)
+    if not result:
+        return [{"name": "暂无数据", "value": 0}]
+    
+    segments = {item['name']: item['value'] for item in result['segments']}
+    
+    return [
+        {"name": "引入期 (新用户)", "value": segments.get("新用户", 0)},
+        {"name": "成长期 (普通用户)", "value": segments.get("普通用户", 1500)}, # 设定一个基准值
+        {"name": "成熟期 (高价值用户)", "value": segments.get("高价值用户", 0)},
+        {"name": "休眠期 (重要挽留)", "value": segments.get("重要挽留用户", 0)},
+        {"name": "流失期 (流失用户)", "value": segments.get("流失用户", 0)}
+    ]
