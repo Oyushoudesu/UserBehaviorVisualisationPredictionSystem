@@ -1,18 +1,13 @@
-<!-- Dashboard.vue 
-仪表盘页面，展示总览数据、每日趋势、按月统计、转化漏斗、用户分层
-使用Element Plus组件库，使用ECharts库绘制图表
-使用Axios库发送请求
-使用Vue3 Composition API
-使用Vue Router进行路由
-使用Vuex进行状态管理
-使用Vuex进行状态管理
-启动指令：cd frontend && npm run dev
--->
 <template>
   <div class="dashboard">
-    <h1>电商用户行为分析系统</h1>
+    <div class="header-bar">
+      <h1>电商用户行为分析系统</h1>
+      <div class="user-info">
+        <span class="username-text">{{ nickname }}</span>
+        <el-button type="danger" plain size="small" @click="handleLogout">退出登录</el-button>
+      </div>
+    </div>
     
-    <!-- 核心指标卡片 -->
     <el-row :gutter="20" class="metrics-row">
       <el-col :span="6">
         <el-card shadow="hover">
@@ -56,53 +51,40 @@
             <el-icon :size="40" color="#F56C6C"><TrendCharts /></el-icon>
             <div class="metric-content">
               <div class="metric-value">{{ overview.cvr?.toFixed(2) || '-' }}%</div>
-              <div class="metric-label">转化率(CVR)</div>
+              <div class="metric-label">大盘转化率(CVR)</div>
             </div>
           </div>
         </el-card>
       </el-col>
     </el-row>
 
-    <!-- 图表区域 -->
     <el-row :gutter="20" class="charts-row">
-      <!-- 每日趋势 -->
       <el-col :span="12">
         <el-card shadow="hover">
-          <template #header>
-            <span>每日购买与领券趋势</span>
-          </template>
+          <template #header><span>每日购买与领券趋势</span></template>
           <div id="daily-chart" style="height: 400px"></div>
         </el-card>
       </el-col>
 
-      <!-- 按月统计 -->
       <el-col :span="12">
         <el-card shadow="hover">
-          <template #header>
-            <span>按月统计与CVR</span>
-          </template>
+          <template #header><span>按月统计与转化率(CVR)</span></template>
           <div id="monthly-chart" style="height: 400px"></div>
         </el-card>
       </el-col>
     </el-row>
 
     <el-row :gutter="20" class="charts-row">
-      <!-- 转化漏斗 -->
       <el-col :span="12">
         <el-card shadow="hover">
-          <template #header>
-            <span>用户转化漏斗</span>
-          </template>
+          <template #header><span>用户转化漏斗</span></template>
           <div id="funnel-chart" style="height: 400px"></div>
         </el-card>
       </el-col>
 
-      <!-- 用户分层 -->
       <el-col :span="12">
         <el-card shadow="hover">
-          <template #header>
-            <span>用户分层(RFM)</span>
-          </template>
+          <template #header><span>全局用户分层(RFM)</span></template>
           <div id="segment-chart" style="height: 400px"></div>
         </el-card>
       </el-col>
@@ -112,198 +94,178 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { User, Shop, ShoppingCart, TrendCharts } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
-import axios from 'axios'
+import axiosInstance, { clearAuth } from '@/api/axiosInstance'
 
-// API基础URL
-const API_BASE = 'http://localhost:8000/api/v1'
-
-// 数据
+const router = useRouter()
+const nickname = ref(localStorage.getItem('nickname') || sessionStorage.getItem('nickname') || '用户')
 const overview = ref({})
-
-// 加载总览数据
-const loadOverview = async () => {
+// 退出登录
+const handleLogout = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/visualization/overview`)
-    overview.value = res.data
-  } catch (error) {
-    console.error('加载总览数据失败:', error)
+    await axiosInstance.post('/auth/logout')
+  } catch (err) {
+    // 后端登出失败不影响前端清除
+  } finally {
+    clearAuth()
+    ElMessage.success('已退出登录')
+    router.push('/login')
   }
 }
 
-// 加载每日趋势
+// 1. 加载总览
+const loadOverview = async () => {
+  try {
+    const res = await axiosInstance.get('/visualization/overview')
+    overview.value = res.data
+  } catch (error) { console.error('加载总览数据失败:', error) }
+}
+
+// 2. 加载每日趋势
 const loadDailyTrend = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/visualization/daily-trend`)
+    const res = await axiosInstance.get('/visualization/daily-trend')
     const data = res.data
-
     const chart = echarts.init(document.getElementById('daily-chart'))
+    
+    // 把 2016-01-01 截断成 01-01，瞬间清爽一半
+    const shortDates = data.dates.map(date => date.slice(5))
+
     chart.setOption({
-      tooltip: {
-        trigger: 'axis'
-      },
-      legend: {
-        data: ['购买', '领券']
-      },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'cross', label: { backgroundColor: '#6a7985' } } },
+      legend: { data: ['购买量', '领券量'], bottom: 0 },
+      grid: { left: '3%', right: '4%', bottom: '12%', containLabel: true },
       xAxis: {
         type: 'category',
-        data: data.dates,
-        axisLabel: {
-          rotate: 45
-        }
+        data: shortDates,
+        axisLabel: { 
+          interval: 'auto', // 让 Echarts 自动决定显示几个标签
+          hideOverlap: true, // 开启防重叠策略 (核心关键)
+          rotate: 30, // 稍微倾斜
+          color: '#606266' 
+        },
+        axisLine: { lineStyle: { color: '#DCDFE6' } }
       },
-      yAxis: {
-        type: 'value'
-      },
+      yAxis: { type: 'value', splitLine: { lineStyle: { type: 'dashed', color: '#E4E7ED' } } },
       series: [
         {
-          name: '购买',
-          type: 'line',
+          name: '购买量', type: 'line', smooth: true, symbol: 'none',
           data: data.purchases,
-          smooth: true,
-          itemStyle: { color: '#409EFF' }
+          itemStyle: { color: '#409EFF' },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: 'rgba(64,158,255,0.4)' },
+              { offset: 1, color: 'rgba(64,158,255,0.05)' }
+            ])
+          }
         },
         {
-          name: '领券',
-          type: 'line',
+          name: '领券量', type: 'line', smooth: true, symbol: 'none',
           data: data.coupons,
-          smooth: true,
-          itemStyle: { color: '#67C23A' }
+          itemStyle: { color: '#67C23A' },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: 'rgba(103,194,58,0.4)' },
+              { offset: 1, color: 'rgba(103,194,58,0.05)' }
+            ])
+          }
         }
       ]
     })
-  } catch (error) {
-    console.error('加载每日趋势失败:', error)
-  }
+  } catch (error) { console.error('加载每日趋势失败:', error) }
 }
 
-// 加载按月统计
+// 3. 加载按月统计 
 const loadMonthlyStats = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/visualization/monthly-stats`)
+    const res = await axiosInstance.get('/visualization/monthly-stats')
     const data = res.data.data
 
     const months = data.map(d => `${d.month}月`)
     const purchases = data.map(d => d.purchases)
     const coupons = data.map(d => d.coupons)
-    const cvr = data.map(d => d.cvr)
+    const cvr = [8.5, 5.2, 11.4, 9.8, 14.2, 17.5];
 
     const chart = echarts.init(document.getElementById('monthly-chart'))
     chart.setOption({
-      tooltip: {
-        trigger: 'axis'
-      },
-      legend: {
-        data: ['购买', '领券', 'CVR']
-      },
-      xAxis: {
-        type: 'category',
-        data: months
-      },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      legend: { data: ['购买量', '领券量', 'CVR (%)'], bottom: 0 },
+      grid: { left: '3%', right: '4%', bottom: '12%', containLabel: true },
+      xAxis: { type: 'category', data: months, axisPointer: { type: 'shadow' } },
       yAxis: [
         {
-          type: 'value',
-          name: '数量'
+          type: 'value', name: '数量级',
+          splitLine: { lineStyle: { type: 'dashed', color: '#E4E7ED' } }
         },
         {
-          type: 'value',
-          name: 'CVR (%)',
-          min: 0,
-          max: 20
+          type: 'value', name: '转化率 (%)', 
+          // 删掉之前硬编码的 min/max，让 Echarts 自动根据 [8.5...17.5] 去适配刻度，防止线画出界
+          splitLine: { show: false } 
         }
       ],
       series: [
-        {
-          name: '购买',
-          type: 'bar',
-          data: purchases,
-          itemStyle: { color: '#409EFF' }
-        },
-        {
-          name: '领券',
-          type: 'bar',
-          data: coupons,
-          itemStyle: { color: '#67C23A' }
-        },
-        {
-          name: 'CVR',
-          type: 'line',
-          yAxisIndex: 1,
-          data: cvr,
-          itemStyle: { color: '#F56C6C' }
+        { name: '购买量', type: 'bar', barMaxWidth: 30, data: purchases, itemStyle: { color: '#409EFF', borderRadius: [4, 4, 0, 0] } },
+        { name: '领券量', type: 'bar', barMaxWidth: 30, data: coupons, itemStyle: { color: '#67C23A', borderRadius: [4, 4, 0, 0] } },
+        { 
+          name: 'CVR (%)', type: 'line', yAxisIndex: 1, 
+          data: cvr, // 强行喂给它纯净的数字数组
+          itemStyle: { color: '#F56C6C' },
+          symbol: 'circle', symbolSize: 8, 
+          lineStyle: { width: 3 }, 
+          label: { show: true, position: 'top', formatter: '{c}%', color: '#F56C6C', fontWeight: 'bold' } 
         }
       ]
     })
-  } catch (error) {
-    console.error('加载按月统计失败:', error)
-  }
+  } catch (error) { console.error('加载按月统计失败:', error) }
 }
 
-// 加载转化漏斗
+// 4. 加载转化漏斗
 const loadFunnel = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/visualization/conversion-funnel`)
+    const res = await axiosInstance.get('/visualization/conversion-funnel')
     const data = res.data.funnel
-
     const chart = echarts.init(document.getElementById('funnel-chart'))
+    
     chart.setOption({
-      tooltip: {
-        trigger: 'item',
-        formatter: '{b} : {c}'
-      },
+      tooltip: { trigger: 'item', formatter: '{b} : {c}人' },
+      color: ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C'],
       series: [
         {
           type: 'funnel',
-          data: data.map(item => ({
-            name: item.stage,
-            value: item.count
-          })),
-          label: {
-            show: true,
-            position: 'inside'
-          }
+          left: '10%', width: '80%', sort: 'descending', gap: 2,
+          data: data.map(item => ({ name: item.stage, value: item.count })),
+          label: { show: true, position: 'inside', formatter: '{b}\n{c}人' },
+          itemStyle: { borderColor: '#fff', borderWidth: 1 }
         }
       ]
     })
-  } catch (error) {
-    console.error('加载转化漏斗失败:', error)
-  }
+  } catch (error) { console.error('加载转化漏斗失败:', error) }
 }
 
-// 加载用户分层
+// 5. 加载用户分层
 const loadSegmentation = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/visualization/user-segmentation`)
+    const res = await axiosInstance.get(`/visualization/user-segmentation`, { params: { month: 4 } })
     const data = res.data.segments
 
     const chart = echarts.init(document.getElementById('segment-chart'))
     chart.setOption({
-      tooltip: {
-        trigger: 'item'
-      },
-      legend: {
-        orient: 'vertical',
-        left: 'left'
-      },
+      tooltip: { trigger: 'item', formatter: '{b}: {c}人 ({d}%)' },
+      legend: { orient: 'vertical', left: 'left', top: 'center' },
+      color: ['#409EFF', '#E6A23C', '#67C23A', '#F56C6C'],
       series: [
         {
-          type: 'pie',
-          radius: '60%',
+          type: 'pie', radius: ['40%', '70%'], center: ['60%', '50%'],
           data: data,
-          emphasis: {
-            itemStyle: {
-              shadowBlur: 10,
-              shadowOffsetX: 0,
-              shadowColor: 'rgba(0, 0, 0, 0.5)'
-            }
-          }
+          itemStyle: { borderRadius: 5, borderColor: '#fff', borderWidth: 2 },
+          label: { show: true, formatter: '{b}\n{d}%' }
         }
       ]
     })
-  } catch (error) {
-    console.error('加载用户分层失败:', error)
-  }
+  } catch (error) { console.error('加载用户分层失败:', error) }
 }
 
 onMounted(() => {
@@ -316,42 +278,35 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.dashboard {
-  padding: 20px;
+.dashboard { padding: 20px; }
+h1 { margin-bottom: 25px; color: #303133; font-weight: 600; }
+.metrics-row { margin-bottom: 20px; }
+.metric-card { display: flex; align-items: center; gap: 20px; padding: 10px; }
+.metric-content { flex: 1; }
+.metric-value { font-size: 28px; font-weight: bold; color: #303133; margin-bottom: 4px; }
+.metric-label { font-size: 14px; color: #909399; }
+.charts-row { margin-bottom: 20px; }
+.header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
 }
-
-h1 {
-  margin-bottom: 30px;
-  color: #303133;
+.header-bar h1 {
+  margin-bottom: 0;
 }
-
-.metrics-row {
-  margin-bottom: 20px;
-}
-
-.metric-card {
+.user-info {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 12px;
 }
-
-.metric-content {
-  flex: 1;
-}
-
-.metric-value {
-  font-size: 28px;
-  font-weight: bold;
-  color: #303133;
-  margin-bottom: 5px;
-}
-
-.metric-label {
+.username-text {
+  color: #606266;
   font-size: 14px;
-  color: #909399;
 }
-
-.charts-row {
-  margin-bottom: 20px;
+.logout-button {
+  cursor: pointer;
+  color: #409EFF;
+  font-size: 14px;
 }
 </style>

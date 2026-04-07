@@ -20,6 +20,7 @@ async def lifespan(app: FastAPI):
     2、关闭时清理缓存。
     """
     print("加载数据到内存...")
+    auth.init_test_users()  # 初始化测试用户
     init_global_cache()  # 初始化全局缓存
     print("数据加载完成，API已准备好")
     yield  # 接受请求
@@ -44,9 +45,9 @@ app.add_middleware(
 )
 
 # 注册路由
-app.include_router(visualization.router, prefix="/api/v1/visualization", tags=["可视化"])
-app.include_router(prediction.router, prefix="/api/v1/prediction", tags=["预测"])
-app.include_router(statistics.router, prefix="/api/v1/statistics", tags=["统计"])
+# app.include_router(visualization.router, prefix="/api/v1/visualization", tags=["可视化"])
+# app.include_router(prediction.router, prefix="/api/v1/prediction", tags=["预测"])
+# app.include_router(statistics.router, prefix="/api/v1/statistics", tags=["统计"])
 
 # ============================================================================
 # 健康检查接口
@@ -69,10 +70,14 @@ def health_check():
 # ============================================================================
 # 导入路由模块
 # ============================================================================
-
-from app.api import visualization, prediction, statistics
-
+from app.api import visualization, prediction, statistics, auth
 # 注册路由
+app.include_router(
+    auth.router,
+    prefix="/api/v1/auth",
+    tags=["认证"]
+)
+
 app.include_router(
     visualization.router,
     prefix="/api/v1/visualization",

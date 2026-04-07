@@ -157,8 +157,8 @@ def get_user_segment(row):
         return '重要挽留用户'
     elif row.get('is_new_user', 0) == 1:
         return '新用户'
-    elif row.get('recency', 0) > 90 :
-        return '流失用户'
+    # elif row.get('recency', 0) > 90 :
+    #     return '流失用户'
     return '普通用户'
 
 def compute_user_stats(features):
@@ -176,7 +176,7 @@ def compute_user_segmentation(features):
         "高价值用户": ((features.get('recency', 999) <= 30) & (features.get('frequency', 0) >= 10)).sum(),
         "重要挽留用户": ((features.get('recency', 999) > 30) & (features.get('frequency', 0) >= 10)).sum(),
         "新用户": (features['is_new_user'] == 1).sum() if 'is_new_user' in features.columns else 0,
-        "流失用户": (features.get('recency', 0) > 90).sum() if 'recency' in features.columns else 0
+#        "流失用户": (features.get('recency', 0) > 90).sum() if 'recency' in features.columns else 0
     }
     return {"segments": [{"name": k, "value": int(v)} for k, v in segments.items()]}
 
