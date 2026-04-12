@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from contextlib import asynccontextmanager
 # 导入你的路由和缓存初始化函数
-from app.api import visualization, statistics, prediction
+from app.api import visualization, statistics, prediction, auth
 from app.services.data_cache import init_global_cache, API_RESULT_CACHE, GLOBAL_DF_CACHE
 
 @asynccontextmanager
@@ -32,7 +32,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="电商用户行为分析与预测系统",
     description="基于O2O数据集的用户复购预测API",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan  # 应用生命周期管理
 )
 
 # 配置CORS（允许前端跨域访问）
@@ -70,7 +71,6 @@ def health_check():
 # ============================================================================
 # 导入路由模块
 # ============================================================================
-from app.api import visualization, prediction, statistics, auth
 # 注册路由
 app.include_router(
     auth.router,

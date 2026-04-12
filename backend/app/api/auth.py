@@ -26,11 +26,13 @@ SECRET_KEY = os.getenv("JWT_SECRET_KEY", "ecommerce-analysis-secret-key-change-i
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 8   # 8小时
 
-DB_URL = os.getenv(
-    "DATABASE_URL",
-    "mysql+pymysql://root:your_password@localhost:3306/ecommerce_analysis"
-)
-
+# DB_URL = os.getenv(
+#     "DATABASE_URL",
+#     "mysql+pymysql://root:your_password@localhost:3306/ecommerce_analysis"
+# )
+from config import DATABASE_URL, JWT_SECRET_KEY
+DB_URL = DATABASE_URL
+SECRET_KEY = JWT_SECRET_KEY
 # ============================================================================
 # 工具初始化
 # ============================================================================
