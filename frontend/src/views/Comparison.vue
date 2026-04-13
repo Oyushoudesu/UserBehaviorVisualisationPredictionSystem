@@ -92,7 +92,7 @@ Vue3 Composition API + Element Plus + ECharts + Axios
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { QuestionFilled, Top, Bottom } from '@element-plus/icons-vue'
+import { QuestionFilled } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import axios from 'axios'
 
@@ -109,13 +109,15 @@ const diffMetrics = ref([
 ])
 
 // ============================================================================
-// 加载对比摘要指标
+// 加载对比摘要指标 + 雷达图（合并为一次请求）
 // ============================================================================
 const loadComparisonSummary = async () => {
+  loading.value.radar = true
   try {
     const res = await axios.get(`${API_BASE}/visualization/comparison-summary`)
     const d = res.data
 
+    // 填充顶部差异指标卡
     diffMetrics.value = [
       {
         key: 'cvr', label: '整体转化率(CVR)',
@@ -144,8 +146,48 @@ const loadComparisonSummary = async () => {
         trend: d.changes.active_users >= 0 ? 'up' : 'down', upIsGood: true
       }
     ]
+
+    // 同一份数据直接渲染雷达图，无需第二次请求
+    const chart = echarts.init(document.getElementById('compare-radar-chart'))
+    chart.setOption({
+      tooltip: {},
+      legend: { data: ['平销期', '促销期'], bottom: 0 },
+      radar: {
+        indicator: [
+          { name: '转化率',   max: 100 },
+          { name: '购买量',   max: 100 },
+          { name: '领券率',   max: 100 },
+          { name: '活跃用户', max: 100 },
+          { name: '复购率',   max: 100 },
+          { name: '核销率',   max: 100 }
+        ],
+        splitNumber: 4,
+        axisName: { color: '#606266', fontSize: 12 }
+      },
+      series: [{
+        type: 'radar',
+        data: [
+          {
+            name: '平销期',
+            value: d.radar?.regular || [60, 50, 55, 65, 45, 50],
+            areaStyle: { opacity: 0.2 },
+            itemStyle: { color: '#409EFF' },
+            lineStyle: { color: '#409EFF' }
+          },
+          {
+            name: '促销期',
+            value: d.radar?.promotion || [80, 85, 75, 90, 65, 70],
+            areaStyle: { opacity: 0.2 },
+            itemStyle: { color: '#F56C6C' },
+            lineStyle: { color: '#F56C6C' }
+          }
+        ]
+      }]
+    })
   } catch (e) {
     console.error('加载对比摘要失败:', e)
+  } finally {
+    loading.value.radar = false
   }
 }
 
@@ -203,58 +245,6 @@ const loadTrend = async () => {
     console.error('加载趋势失败:', e)
   } finally {
     loading.value.trend = false
-  }
-}
-
-// ============================================================================
-// 多维指标对比雷达图
-// ============================================================================
-const loadRadar = async () => {
-  loading.value.radar = true
-  try {
-    const res = await axios.get(`${API_BASE}/visualization/comparison-summary`)
-    const d = res.data
-
-    const chart = echarts.init(document.getElementById('compare-radar-chart'))
-    chart.setOption({
-      tooltip: {},
-      legend: { data: ['平销期', '促销期'], bottom: 0 },
-      radar: {
-        indicator: [
-          { name: '转化率', max: 100 },
-          { name: '购买量', max: 100 },
-          { name: '领券率', max: 100 },
-          { name: '活跃用户', max: 100 },
-          { name: '复购率', max: 100 },
-          { name: '核销率', max: 100 }
-        ],
-        splitNumber: 4,
-        axisName: { color: '#606266', fontSize: 12 }
-      },
-      series: [{
-        type: 'radar',
-        data: [
-          {
-            name: '平销期',
-            value: d.radar?.regular || [60, 50, 55, 65, 45, 50],
-            areaStyle: { opacity: 0.2 },
-            itemStyle: { color: '#409EFF' },
-            lineStyle: { color: '#409EFF' }
-          },
-          {
-            name: '促销期',
-            value: d.radar?.promotion || [80, 85, 75, 90, 65, 70],
-            areaStyle: { opacity: 0.2 },
-            itemStyle: { color: '#F56C6C' },
-            lineStyle: { color: '#F56C6C' }
-          }
-        ]
-      }]
-    })
-  } catch (e) {
-    console.error('加载雷达图失败:', e)
-  } finally {
-    loading.value.radar = false
   }
 }
 
@@ -359,7 +349,6 @@ const load618Effect = async () => {
 onMounted(() => {
   loadComparisonSummary()
   loadTrend()
-  loadRadar()
   loadActiveUsers()
   load618Effect()
 })

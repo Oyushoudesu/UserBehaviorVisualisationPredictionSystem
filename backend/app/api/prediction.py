@@ -183,10 +183,10 @@ def get_batch_prediction_stats(model_type: str = "regular"):
     #                if col not in ['user_id', 'label']]
     # X = features_df[feature_cols]
     
-    # if 'label' not in features_df.columns:
-    #     raise HTTPException(status_code=500, detail="特征数据中缺少真实的 label 列，无法计算评估指标")
+    if 'label' not in features_df.columns:
+        raise HTTPException(status_code=500, detail="特征数据中缺少真实的 label 列，无法计算评估指标")
         
-    # y_true = features_df['label']
+    y_true = features_df['label']
     
     # # 预测
     # xgb_model = models[model_type]["xgb"]

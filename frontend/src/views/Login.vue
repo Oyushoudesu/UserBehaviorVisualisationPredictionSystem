@@ -19,7 +19,7 @@ Vue3 Composition API + Element Plus + Axios + Vue Router
           <el-icon :size="36" color="#fff"><DataAnalysis /></el-icon>
         </div>
         <h2>电商用户行为分析系统</h2>
-        <p class="subtitle">基于阿里O2O数据集的智能分析平台</p>
+        <p class="subtitle">基于阿里电商数据集的智能分析平台</p>
       </div>
 
       <!-- 表单区 -->
