@@ -6,6 +6,8 @@
 import pandas as pd
 import numpy as np
 import os
+# 项目根目录（data_cache.py 位于 backend/app/services/，向上三级）
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 
 # 全局结果缓存字典
 API_RESULT_CACHE = {}
@@ -181,6 +183,7 @@ def compute_user_segmentation(features):
     return {"segments": [{"name": k, "value": int(v)} for k, v in segments.items()]}
 
 def compute_group_conversion(features):
+    features = features.copy()
     features['segment'] = features.apply(get_user_segment, axis=1)
     groups = ['高价值用户', '重要挽留用户', '普通用户', '新用户']
     result = {'groups': groups, 'ctr': [], 'coupon_rate': [], 'redemption_rate': [], 'cvr': []}
@@ -212,7 +215,7 @@ def compute_group_conversion(features):
 def init_global_cache():
     '''在FastAPI启动时调用，执行所有预计算并填充API_RESULT_CACHE'''
     # 处理原始行为日志(online_data.csv)
-    raw_path = 'data/raw/online_data.csv'
+    raw_path = os.path.join(PROJECT_ROOT, 'data/raw/online_data.csv')
     if os.path.exists(raw_path):
         print("加载原始数据集")
         df = pd.read_csv(raw_path)
@@ -250,7 +253,7 @@ def init_global_cache():
     API_RESULT_CACHE['group_conversion'] = {}
     # 遍历可能的月份特征表
     for month in [4,5,6]:
-        feat_path = f'data/features/user_features_month{month}.csv'
+        feat_path = os.path.join(PROJECT_ROOT, f'data/features/user_features_month{month}.csv')
         if os.path.exists(feat_path):
             features = pd.read_csv(feat_path)
             # 存入全局 DF 缓存

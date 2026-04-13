@@ -240,6 +240,7 @@ Vue3 Composition API + Element Plus + ECharts + Axios
 import { ref, onMounted } from 'vue'
 import * as echarts from 'echarts'
 import axios from 'axios'
+import { ElMessage } from 'element-plus'
 
 const API_BASE = 'http://localhost:8000/api/v1'
 
@@ -267,8 +268,11 @@ const runSinglePredict = async () => {
     singleResult.value = res.data[0]
     renderGauge(res.data[0].probability)
   } catch (e) {
+    const msg = e.response?.data?.detail || '预测失败，请检查用户ID是否存在'
+    ElMessage.error(msg)
     console.error('单用户预测失败:', e)
-  } finally {
+  }
+  finally {
     singleLoading.value = false
   }
 }
@@ -326,6 +330,8 @@ const runBatchPredict = async () => {
     })
     batchResults.value = res.data
   } catch (e) {
+    const msg = e.response?.data?.detail || '批量预测失败，请检查用户ID'
+    ElMessage.error(msg)
     console.error('批量预测失败:', e)
   } finally {
     batchLoading.value = false
