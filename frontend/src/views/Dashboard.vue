@@ -1,57 +1,56 @@
 <template>
   <div class="dashboard">
     <div class="header-bar">
-      <h1>电商用户行为分析系统</h1>
       <div class="user-info">
-        <span class="username-text">{{ nickname }}</span>
+        <span class="username-text">欢迎，{{ nickname }}</span>
         <el-button type="danger" plain size="small" @click="handleLogout">退出登录</el-button>
       </div>
     </div>
-    
+
     <el-row :gutter="20" class="metrics-row">
       <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="metric-card">
-            <el-icon :size="40" color="#409EFF"><User /></el-icon>
-            <div class="metric-content">
-              <div class="metric-value">{{ overview.total_users?.toLocaleString() || '-' }}</div>
-              <div class="metric-label">总用户数</div>
+        <el-card shadow="never" class="stat-card stat-blue">
+          <div class="stat-inner">
+            <div class="stat-icon"><el-icon :size="22" color="#fff"><User /></el-icon></div>
+            <div class="stat-body">
+              <div class="stat-value">{{ overview.total_users?.toLocaleString() || '—' }}</div>
+              <div class="stat-label">总用户数</div>
             </div>
           </div>
         </el-card>
       </el-col>
-      
+
       <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="metric-card">
-            <el-icon :size="40" color="#67C23A"><Shop /></el-icon>
-            <div class="metric-content">
-              <div class="metric-value">{{ overview.total_merchants?.toLocaleString() || '-' }}</div>
-              <div class="metric-label">商户数</div>
+        <el-card shadow="never" class="stat-card stat-green">
+          <div class="stat-inner">
+            <div class="stat-icon"><el-icon :size="22" color="#fff"><Shop /></el-icon></div>
+            <div class="stat-body">
+              <div class="stat-value">{{ overview.total_merchants?.toLocaleString() || '—' }}</div>
+              <div class="stat-label">商户数</div>
             </div>
           </div>
         </el-card>
       </el-col>
-      
+
       <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="metric-card">
-            <el-icon :size="40" color="#E6A23C"><ShoppingCart /></el-icon>
-            <div class="metric-content">
-              <div class="metric-value">{{ overview.total_purchases?.toLocaleString() || '-' }}</div>
-              <div class="metric-label">总购买数</div>
+        <el-card shadow="never" class="stat-card stat-orange">
+          <div class="stat-inner">
+            <div class="stat-icon"><el-icon :size="22" color="#fff"><ShoppingCart /></el-icon></div>
+            <div class="stat-body">
+              <div class="stat-value">{{ overview.total_purchases?.toLocaleString() || '—' }}</div>
+              <div class="stat-label">总购买数</div>
             </div>
           </div>
         </el-card>
       </el-col>
-      
+
       <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="metric-card">
-            <el-icon :size="40" color="#F56C6C"><TrendCharts /></el-icon>
-            <div class="metric-content">
-              <div class="metric-value">{{ overview.cvr?.toFixed(2) || '-' }}%</div>
-              <div class="metric-label">大盘转化率(CVR)</div>
+        <el-card shadow="never" class="stat-card stat-red">
+          <div class="stat-inner">
+            <div class="stat-icon"><el-icon :size="22" color="#fff"><TrendCharts /></el-icon></div>
+            <div class="stat-body">
+              <div class="stat-value">{{ overview.cvr?.toFixed(2) || '—' }}%</div>
+              <div class="stat-label">大盘转化率 CVR</div>
             </div>
           </div>
         </el-card>
@@ -279,34 +278,45 @@ onMounted(() => {
 
 <style scoped>
 .dashboard { padding: 20px; }
-h1 { margin-bottom: 25px; color: #303133; font-weight: 600; }
 .metrics-row { margin-bottom: 20px; }
-.metric-card { display: flex; align-items: center; gap: 20px; padding: 10px; }
-.metric-content { flex: 1; }
-.metric-value { font-size: 28px; font-weight: bold; color: #303133; margin-bottom: 4px; }
-.metric-label { font-size: 14px; color: #909399; }
-.charts-row { margin-bottom: 20px; }
+.charts-row  { margin-bottom: 20px; }
+
 .header-bar {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-  margin-bottom: 25px;
+  margin-bottom: 20px;
 }
-.header-bar h1 {
-  margin-bottom: 0;
+.user-info  { display: flex; align-items: center; gap: 12px; }
+.username-text { color: #606266; font-size: 14px; }
+
+/* ── Stat Cards ── */
+.stat-card {
+  border-top: 3px solid transparent !important;
+  border-radius: 10px !important;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08) !important;
 }
-.username-text {
-  color: #606266;
-  font-size: 14px;
+.stat-blue   { border-top-color: #3b82f6 !important; }
+.stat-green  { border-top-color: #22c55e !important; }
+.stat-orange { border-top-color: #f59e0b !important; }
+.stat-red    { border-top-color: #ef4444 !important; }
+
+.stat-inner { display: flex; align-items: center; gap: 16px; padding: 6px 2px; }
+
+.stat-icon {
+  width: 50px; height: 50px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
 }
-.logout-button {
-  cursor: pointer;
-  color: #409EFF;
-  font-size: 14px;
-}
+.stat-blue   .stat-icon { background: linear-gradient(135deg, #3b82f6, #06b6d4); box-shadow: 0 4px 12px rgba(59,130,246,0.3); }
+.stat-green  .stat-icon { background: linear-gradient(135deg, #22c55e, #16a34a); box-shadow: 0 4px 12px rgba(34,197,94,0.3); }
+.stat-orange .stat-icon { background: linear-gradient(135deg, #f59e0b, #ea580c); box-shadow: 0 4px 12px rgba(245,158,11,0.3); }
+.stat-red    .stat-icon { background: linear-gradient(135deg, #ef4444, #e11d48); box-shadow: 0 4px 12px rgba(239,68,68,0.3); }
+
+.stat-value { font-size: 26px; font-weight: 700; color: #1e293b; line-height: 1.2; }
+.stat-label { font-size: 13px; color: #94a3b8; margin-top: 4px; }
 </style>
