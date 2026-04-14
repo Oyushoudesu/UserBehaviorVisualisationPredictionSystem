@@ -18,10 +18,10 @@
               </div>
 
               <div class="field">
-                <div class="field-label">模型场景</div>
-                <el-select v-model="singleForm.model_type" style="width:100%">
-                  <el-option label="平销期模型（1-4月）" value="regular" />
-                  <el-option label="促销期模型（含618）"  value="promotion" />
+                <div class="field-label">预测模式</div>
+                <el-select v-model="singleForm.pred_mode" style="width:100%">
+                  <el-option label="加权集成（0.67×XGB + 0.33×LGB）" value="ensemble" />
+                  <el-option label="Stacking 元学习（XGB+LGB→LR）"   value="stacking" />
                 </el-select>
               </div>
 
@@ -33,7 +33,7 @@
                   size="large"
                   clearable
                 />
-                <div class="field-hint">可从特征文件中选取真实用户ID</div>
+                <div class="field-hint">可从 test_618.csv 中选取真实用户ID</div>
               </div>
 
               <button
@@ -57,7 +57,7 @@
               <div v-if="!singleResult" class="empty-state">
                 <div class="empty-icon">🤖</div>
                 <div class="empty-text">输入用户 ID 后点击预测</div>
-                <div class="empty-sub">融合 XGBoost + LightGBM 双模型输出结果</div>
+                <div class="empty-sub">支持加权集成与 Stacking 元学习两种预测模式</div>
               </div>
 
               <div v-else class="result-body">
@@ -110,10 +110,10 @@
               </div>
 
               <div class="field">
-                <div class="field-label">模型场景</div>
-                <el-select v-model="batchForm.model_type" style="width:100%">
-                  <el-option label="平销期模型（1-4月）" value="regular" />
-                  <el-option label="促销期模型（含618）"  value="promotion" />
+                <div class="field-label">预测模式</div>
+                <el-select v-model="batchForm.pred_mode" style="width:100%">
+                  <el-option label="加权集成（0.67×XGB + 0.33×LGB）" value="ensemble" />
+                  <el-option label="Stacking 元学习（XGB+LGB→LR）"   value="stacking" />
                 </el-select>
               </div>
 
@@ -193,8 +193,8 @@
 
         <div class="perf-switch">
           <el-radio-group v-model="perfModelType" @change="onModelChange">
-            <el-radio-button label="regular">平销期模型</el-radio-button>
-            <el-radio-button label="promotion">促销期模型</el-radio-button>
+            <el-radio-button label="ensemble">加权集成模型</el-radio-button>
+            <el-radio-button label="stacking">Stacking 元学习</el-radio-button>
           </el-radio-group>
         </div>
 
@@ -278,7 +278,7 @@ const API_BASE = 'http://localhost:8000/api/v1'
 const activeTab = ref('single')
 
 // ── 单用户预测 ──
-const singleForm   = ref({ model_type: 'regular', user_id: '' })
+const singleForm   = ref({ pred_mode: 'ensemble', user_id: '' })
 const singleLoading = ref(false)
 const singleResult  = ref(null)
 
@@ -291,8 +291,8 @@ const runSinglePredict = async () => {
   singleResult.value  = null
   try {
     const res = await axios.post(`${API_BASE}/prediction/repurchase`, {
-      user_ids:   [singleForm.value.user_id.trim()],
-      model_type: singleForm.value.model_type
+      user_ids:  [singleForm.value.user_id.trim()],
+      pred_mode: singleForm.value.pred_mode
     })
     singleResult.value = res.data[0]
     renderGauge(res.data[0].probability)
@@ -336,7 +336,7 @@ const renderGauge = (prob) => {
 }
 
 // ── 批量预测 ──
-const batchForm    = ref({ model_type: 'regular', user_ids_text: '' })
+const batchForm    = ref({ pred_mode: 'ensemble', user_ids_text: '' })
 const batchLoading = ref(false)
 const batchResults = ref([])
 
@@ -347,8 +347,8 @@ const runBatchPredict = async () => {
   batchResults.value = []
   try {
     const res = await axios.post(`${API_BASE}/prediction/repurchase`, {
-      user_ids:   ids,
-      model_type: batchForm.value.model_type
+      user_ids:  ids,
+      pred_mode: batchForm.value.pred_mode
     })
     batchResults.value = res.data
   } catch (e) {
@@ -370,7 +370,7 @@ const exportBatch = () => {
 }
 
 // ── 模型性能 ──
-const perfModelType  = ref('regular')
+const perfModelType  = ref('ensemble')
 const perfLoading    = ref(false)
 const featureLoading = ref(false)
 const perfStats      = ref({})
@@ -398,7 +398,7 @@ const loadPerformance = async () => {
   perfLoaded.value     = true
   try {
     const res = await axios.get(`${API_BASE}/prediction/batch-stats`, {
-      params: { model_type: perfModelType.value }
+      params: { pred_mode: perfModelType.value }
     })
     perfStats.value = res.data
   } catch (e) {
@@ -409,7 +409,7 @@ const loadPerformance = async () => {
 
   try {
     const res = await axios.get(`${API_BASE}/prediction/feature-importance`, {
-      params: { model_type: perfModelType.value, top_n: 20 }
+      params: { pred_mode: perfModelType.value, top_n: 20 }
     })
     renderFeatureChart(res.data)
   } catch (e) {

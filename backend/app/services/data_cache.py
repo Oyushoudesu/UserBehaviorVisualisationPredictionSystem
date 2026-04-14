@@ -270,4 +270,13 @@ def init_global_cache():
         else:
             print(f"特征数据文件 {feat_path} 未找到")
 
+    # 加载滑动窗口预测数据（test_618.csv）
+    pred_path = os.path.join(PROJECT_ROOT, 'data/features/test_618.csv')
+    if os.path.exists(pred_path):
+        pred_df = pd.read_csv(pred_path)
+        GLOBAL_DF_CACHE["prediction_data"] = pred_df
+        print(f"滑动窗口预测数据加载成功: {len(pred_df)} 条记录")
+    else:
+        print("预测数据文件 test_618.csv 未找到")
+
 init_global_cache()
