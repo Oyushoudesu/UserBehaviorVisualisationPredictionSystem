@@ -70,6 +70,15 @@ class RegisterRequest(BaseModel):
     password: str
     nickname: Optional[str] = None
 
+class UpdateProfileRequest(BaseModel):
+    nickname: Optional[str] = None
+    new_username: Optional[str] = None
+    current_password: Optional[str] = None  # 修改用户名时需要验证当前密码
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
 # ============================================================================
 # 工具函数
 # ============================================================================
@@ -257,6 +266,109 @@ async def register(req: RegisterRequest):
     except Exception as e:
         print(f"注册失败: {e}")
         raise HTTPException(status_code=500, detail="服务器内部错误，请稍后重试")
+
+# ============================================================================
+# 接口5: 修改个人资料（昵称 / 用户名）
+# ============================================================================
+
+@router.put("/profile")
+async def update_profile(
+    req: UpdateProfileRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    修改个人资料
+    - 修改昵称：直接修改，无需验证密码
+    - 修改用户名：需提供 current_password 验证身份，且新用户名不能重复
+    """
+    if engine is None:
+        raise HTTPException(status_code=503, detail="数据库不可用")
+
+    nickname = (req.nickname or "").strip() or None
+    new_username = (req.new_username or "").strip() or None
+
+    if not nickname and not new_username:
+        raise HTTPException(status_code=422, detail="昵称和用户名不能同时为空")
+
+    # 修改用户名时需要验证当前密码
+    if new_username:
+        if not req.current_password:
+            raise HTTPException(status_code=422, detail="修改用户名需要提供当前密码")
+        if not verify_password(req.current_password, current_user["password"]):
+            raise HTTPException(status_code=401, detail="当前密码不正确")
+        if len(new_username) < 3 or len(new_username) > 20:
+            raise HTTPException(status_code=422, detail="用户名长度须在 3-20 个字符之间")
+
+    try:
+        with engine.begin() as conn:
+            if new_username and new_username != current_user["username"]:
+                existing = conn.execute(
+                    text("SELECT id FROM sys_user WHERE username = :username"),
+                    {"username": new_username}
+                ).fetchone()
+                if existing:
+                    raise HTTPException(status_code=409, detail="该用户名已被占用，请更换")
+
+            updates = []
+            params = {"id": current_user["id"]}
+            if new_username:
+                updates.append("username = :username")
+                params["username"] = new_username
+            if nickname:
+                updates.append("nickname = :nickname")
+                params["nickname"] = nickname
+
+            conn.execute(
+                text(f"UPDATE sys_user SET {', '.join(updates)} WHERE id = :id"),
+                params
+            )
+
+        return {
+            "message": "资料更新成功",
+            "username": new_username or current_user["username"],
+            "nickname": nickname or current_user["nickname"]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"修改资料失败: {e}")
+        raise HTTPException(status_code=500, detail="服务器内部错误，请稍后重试")
+
+
+# ============================================================================
+# 接口6: 修改密码
+# ============================================================================
+
+@router.put("/password")
+async def change_password(
+    req: ChangePasswordRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """修改密码：验证旧密码后更新为新密码"""
+    if engine is None:
+        raise HTTPException(status_code=503, detail="数据库不可用")
+
+    if not verify_password(req.old_password, current_user["password"]):
+        raise HTTPException(status_code=401, detail="原密码不正确")
+
+    if len(req.new_password) < 6:
+        raise HTTPException(status_code=422, detail="新密码长度不能少于 6 个字符")
+
+    if req.old_password == req.new_password:
+        raise HTTPException(status_code=422, detail="新密码不能与原密码相同")
+
+    try:
+        hashed = pwd_context.hash(req.new_password)
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE sys_user SET password = :password WHERE id = :id"),
+                {"password": hashed, "id": current_user["id"]}
+            )
+        return {"message": "密码修改成功，请重新登录"}
+    except Exception as e:
+        print(f"修改密码失败: {e}")
+        raise HTTPException(status_code=500, detail="服务器内部错误，请稍后重试")
+
 
 # ============================================================================
 # 用户初始化函数

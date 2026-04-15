@@ -12,6 +12,7 @@ import BehaviorFlow from '../views/BehaviorFlow.vue'
 import UserAnalysis from '../views/UserAnalysis.vue'
 import Prediction from '../views/Prediction.vue'
 import Comparison from '../views/Comparison.vue'
+import Profile from '../views/Profile.vue'
 
 const routes = [
     {
@@ -59,6 +60,12 @@ const routes = [
         name: 'Comparison',
         component: Comparison,
         meta: { requiresAuth: true, title: '平销期vs促销期' }
+    },
+    {
+        path: '/profile',
+        name: 'Profile',
+        component: Profile,
+        meta: { requiresAuth: true, title: '个人设置' }
     },
      // 兜底重定向
     { path: '/:pathMatch(.*)*', redirect: '/dashboard' }

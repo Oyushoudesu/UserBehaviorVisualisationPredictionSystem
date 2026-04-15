@@ -42,7 +42,25 @@
       <!-- 顶部栏（登录页隐藏） -->
       <header v-if="!isLoginPage" class="topbar">
         <div class="page-title">{{ currentPageTitle }}</div>
-        <div class="topbar-time">{{ currentTime }}</div>
+        <div class="topbar-right">
+          <div class="topbar-time">{{ currentTime }}</div>
+          <el-dropdown trigger="click" @command="handleUserCommand">
+            <div class="user-avatar">{{ avatarLetter }}</div>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item disabled>
+                  <span class="dropdown-user-info">{{ nickname }} · {{ username }}</span>
+                </el-dropdown-item>
+                <el-dropdown-item divided command="profile">
+                  <el-icon><Setting /></el-icon> 个人设置
+                </el-dropdown-item>
+                <el-dropdown-item command="logout">
+                  <el-icon><SwitchButton /></el-icon> 退出登录
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
       </header>
 
       <main class="content">
@@ -54,11 +72,35 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { DataAnalysis, Odometer, Share, UserFilled, MagicStick, DataLine } from '@element-plus/icons-vue'
+import { useRoute, useRouter } from 'vue-router'
+import { DataAnalysis, Odometer, Share, UserFilled, MagicStick, DataLine, Setting, SwitchButton } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const route = useRoute()
-const isLoginPage = computed(() => route.path === '/login')
+const router = useRouter()
+
+// 用户信息
+const getStorage = (key) => localStorage.getItem(key) || sessionStorage.getItem(key) || ''
+const username = computed(() => getStorage('username'))
+const nickname = computed(() => getStorage('nickname'))
+const avatarLetter = computed(() => (nickname.value || username.value || '?')[0].toUpperCase())
+
+const handleUserCommand = async (command) => {
+  if (command === 'profile') {
+    router.push('/profile')
+  } else if (command === 'logout') {
+    await ElMessageBox.confirm('确认退出登录？', '提示', {
+      confirmButtonText: '退出',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }).catch(() => null)
+    localStorage.clear()
+    sessionStorage.clear()
+    ElMessage.success('已退出登录')
+    router.push('/login')
+  }
+}
+const isLoginPage = computed(() => route.path === '/login' || route.path === '/register')
 
 const navItems = [
   { path: '/dashboard',     label: 'Dashboard',     icon: Odometer,   tag: null },
@@ -74,6 +116,7 @@ const pageTitleMap = {
   '/user-analysis': 'User Analysis · 用户分析',
   '/prediction':    'Prediction · 智能预测',
   '/comparison':    'Comparison · 对比分析',
+  '/profile':       'Profile · 个人设置',
 }
 const currentPageTitle = computed(() => pageTitleMap[route.path] || '电商用户行为分析系统')
 
@@ -191,7 +234,18 @@ body {
   position: sticky; top: 0; z-index: 50;
 }
 .page-title { font-size: 14px; font-weight: 600; color: #1e293b; letter-spacing: 0.3px; }
+.topbar-right { display: flex; align-items: center; gap: 16px; }
 .topbar-time { font-size: 12px; color: #94a3b8; font-variant-numeric: tabular-nums; }
+.user-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6, #06b6d4);
+  color: #fff; font-size: 14px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: box-shadow 0.2s;
+}
+.user-avatar:hover { box-shadow: 0 0 0 3px rgba(59,130,246,0.25); }
+.dropdown-user-info { font-size: 12px; color: #94a3b8; }
 
 .content { flex: 1; background: #f1f5f9; }
 </style>
