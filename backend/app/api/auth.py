@@ -65,6 +65,11 @@ class UserInfo(BaseModel):
     role: str
     last_login: Optional[str]
 
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+    nickname: Optional[str] = None
+
 # ============================================================================
 # 工具函数
 # ============================================================================
@@ -199,6 +204,59 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 async def logout(current_user: dict = Depends(get_current_user)):
     """登出（前端负责清除本地Token）"""
     return {"message": f"用户 {current_user['username']} 已登出"}
+
+# ============================================================================
+# 接口4: 用户注册
+# ============================================================================
+
+@router.post("/register", status_code=201)
+async def register(req: RegisterRequest):
+    """
+    用户注册
+
+    Body: { username, password, nickname? }
+    - 用户名长度 3-20 个字符
+    - 密码长度不少于 6 个字符
+    - 用户名不可重复
+    - 注册成功后角色默认为 viewer，需管理员手动提升
+    """
+    if engine is None:
+        raise HTTPException(status_code=503, detail="数据库不可用，无法注册")
+
+    username = req.username.strip()
+    password = req.password
+
+    if len(username) < 3 or len(username) > 20:
+        raise HTTPException(status_code=422, detail="用户名长度须在 3-20 个字符之间")
+    if len(password) < 6:
+        raise HTTPException(status_code=422, detail="密码长度不能少于 6 个字符")
+
+    try:
+        with engine.begin() as conn:
+            # 查重
+            existing = conn.execute(
+                text("SELECT id FROM sys_user WHERE username = :username"),
+                {"username": username}
+            ).fetchone()
+            if existing:
+                raise HTTPException(status_code=409, detail="该用户名已被注册，请更换")
+
+            # 写入
+            hashed = pwd_context.hash(password)
+            nickname = (req.nickname or "").strip() or username
+            conn.execute(
+                text("""INSERT INTO sys_user
+                        (username, password, nickname, role, is_active, created_at)
+                        VALUES (:username, :password, :nickname, 'viewer', 1, NOW())"""),
+                {"username": username, "password": hashed, "nickname": nickname}
+            )
+        print(f"新用户注册成功: {username}")
+        return {"message": "注册成功，请返回登录页面"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"注册失败: {e}")
+        raise HTTPException(status_code=500, detail="服务器内部错误，请稍后重试")
 
 # ============================================================================
 # 用户初始化函数

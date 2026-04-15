@@ -6,6 +6,7 @@ import {
 }from 'vue-router'
 
 import Login      from '@/views/Login.vue'
+import Register   from '@/views/Register.vue'
 import Dashboard from '../views/Dashboard.vue'
 import BehaviorFlow from '../views/BehaviorFlow.vue'
 import UserAnalysis from '../views/UserAnalysis.vue'
@@ -14,10 +15,16 @@ import Comparison from '../views/Comparison.vue'
 
 const routes = [
     {
-    path: '/login',
-    name: 'Login',
-    component: Login,
-    meta: { requiresAuth: false, title: '登录' }
+        path: '/login',
+        name: 'Login',
+        component: Login,
+        meta: { requiresAuth: false, title: '登录' }
+    },
+    {
+        path: '/register',
+        name: 'Register',
+        component: Register,
+        meta: { requiresAuth: false, title: '注册' }
     },
     {
         path: '/',

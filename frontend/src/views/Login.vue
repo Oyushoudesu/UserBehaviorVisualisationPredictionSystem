@@ -68,6 +68,12 @@ Vue3 Composition API + Element Plus + Axios + Vue Router
         </el-button>
       </el-form>
 
+      <!-- 注册入口 -->
+      <div class="to-register">
+        还没有账号？
+        <el-link type="primary" @click="router.push('/register')">立即注册</el-link>
+      </div>
+
       <!-- 演示账号提示 -->
       <div class="demo-hint">
         <el-divider>演示账号</el-divider>
@@ -91,10 +97,9 @@ Vue3 Composition API + Element Plus + Axios + Vue Router
 <script setup>
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
+
 import { ElMessage } from 'element-plus'
 import { User, Lock, DataAnalysis } from '@element-plus/icons-vue'
-import axios from 'axios'
-
 import axiosInstance from '@/api/axiosInstance'
 const router = useRouter()
 
@@ -236,6 +241,15 @@ const handleLogin = async () => {
   font-size: 16px;
   letter-spacing: 4px;
   height: 44px;
+}
+
+/* 注册入口 */
+.to-register {
+  text-align: center;
+  margin-top: 12px;
+  margin-bottom: 4px;
+  font-size: 13px;
+  color: #909399;
 }
 
 /* 演示账号 */
