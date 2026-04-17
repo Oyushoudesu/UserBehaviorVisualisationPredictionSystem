@@ -263,7 +263,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
@@ -271,8 +271,18 @@ import {
   User, Setting, DataAnalysis, List, Grid,
   TrendCharts, Odometer, DataLine, Aim, Search, Timer
 } from '@element-plus/icons-vue'
+import { useTheme } from '@/composables/useTheme'
 
 const API_BASE = 'http://localhost:8000/api/v1'
+const { isDark } = useTheme()
+
+// re-render ECharts on theme change
+watch(isDark, () => {
+  if (singleResult.value) renderGauge(singleResult.value.probability)
+  if (perfLoaded.value)   renderFeatureChart(cachedFeatureData.value)
+})
+
+const cachedFeatureData = ref(null)
 
 // ── Tab ──
 const activeTab = ref('single')
@@ -307,9 +317,8 @@ const renderGauge = (prob) => {
   setTimeout(() => {
     const el = document.getElementById('gauge-chart')
     if (!el) return
-    const inst = echarts.getInstanceByDom(el)
-    if (inst) inst.dispose()
-    echarts.init(el).setOption({
+    echarts.getInstanceByDom(el)?.dispose()
+    echarts.init(el, isDark.value ? 'dark' : null).setOption({
       series: [{
         type: 'gauge',
         startAngle: 200, endAngle: -20, min: 0, max: 1, splitNumber: 5,
@@ -420,14 +429,13 @@ const loadPerformance = async () => {
 }
 
 const renderFeatureChart = (data) => {
-  // 延迟等 Tab 动画结束、loading 遮罩消失，再初始化 ECharts
+  if (!data) return
+  cachedFeatureData.value = data
   setTimeout(() => {
     const el = document.getElementById('feature-chart')
     if (!el) return
-    const inst = echarts.getInstanceByDom(el)
-    if (inst) inst.dispose()
-
-    const chart    = echarts.init(el)
+    echarts.getInstanceByDom(el)?.dispose()
+    const chart = echarts.init(el, isDark.value ? 'dark' : null)
     const features = [...data.features].reverse()
     const importance = [...data.importance].reverse()
 
@@ -466,11 +474,11 @@ const renderFeatureChart = (data) => {
 </script>
 
 <style scoped>
-.prediction { padding: 20px; }
+.prediction { padding: 16px 20px; background: var(--bg-page); min-height: 100%; }
 
 /* ── Tabs ── */
 .pred-tabs :deep(.el-tabs__header) {
-  background: #fff;
+  background: var(--bg-card);
   border-radius: 10px 10px 0 0;
   border-bottom: 1px solid #e2e8f0;
   margin-bottom: 0;
@@ -491,9 +499,9 @@ const renderFeatureChart = (data) => {
 
 /* ── Panel ── */
 .panel {
-  background: #fff;
+  background: var(--bg-card);
   border-radius: 10px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
   padding: 20px;
 }
 .result-panel { min-height: 360px; }
@@ -504,10 +512,10 @@ const renderFeatureChart = (data) => {
   gap: 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-primary);
   padding-bottom: 14px;
   margin-bottom: 16px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--border);
 }
 
 /* ── Fields ── */
@@ -567,7 +575,7 @@ const renderFeatureChart = (data) => {
 
 .meta-row    { display: flex; gap: 28px; }
 .meta-label  { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-.meta-val    { font-size: 14px; font-weight: 600; color: #1e293b; }
+.meta-val    { font-size: 14px; font-weight: 600; color: var(--text-primary); }
 
 /* ── Perf switch ── */
 .perf-switch { margin-bottom: 20px; }
@@ -581,24 +589,24 @@ const renderFeatureChart = (data) => {
 }
 .metric-box        { border-radius: 10px; padding: 16px; }
 .metric-box-icon   { width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; }
-.metric-box-val    { font-size: 26px; font-weight: 700; color: #1e293b; }
-.metric-box-label  { font-size: 12px; color: #64748b; margin-top: 2px; }
+.metric-box-val    { font-size: 26px; font-weight: 700; color: var(--text-primary); }
+.metric-box-label  { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
 
-.mb-blue   { background: #eff6ff; }
+.mb-blue   { background: rgba(59,130,246,0.08); }
 .mb-blue   .metric-box-icon { background: linear-gradient(135deg, #3b82f6, #06b6d4); box-shadow: 0 3px 8px rgba(59,130,246,0.3); }
-.mb-green  { background: #f0fdf4; }
+.mb-green  { background: rgba(16,185,129,0.08); }
 .mb-green  .metric-box-icon { background: linear-gradient(135deg, #22c55e, #16a34a); box-shadow: 0 3px 8px rgba(34,197,94,0.3); }
-.mb-orange { background: #fffbeb; }
+.mb-orange { background: rgba(245,158,11,0.08); }
 .mb-orange .metric-box-icon { background: linear-gradient(135deg, #f59e0b, #ea580c); box-shadow: 0 3px 8px rgba(245,158,11,0.3); }
-.mb-purple { background: #faf5ff; }
+.mb-purple { background: rgba(139,92,246,0.08); }
 .mb-purple .metric-box-icon { background: linear-gradient(135deg, #8b5cf6, #6d28d9); box-shadow: 0 3px 8px rgba(139,92,246,0.3); }
 
 /* ── Extra stats ── */
 .extra-stats {
   display: flex; flex-direction: column; gap: 10px;
-  background: #f8fafc; border-radius: 8px; padding: 14px;
+  background: var(--bg-page); border-radius: 8px; padding: 14px;
 }
 .extra-item  { display: flex; justify-content: space-between; align-items: center; }
-.extra-label { font-size: 13px; color: #64748b; }
-.extra-val   { font-size: 14px; font-weight: 700; color: #1e293b; }
+.extra-label { font-size: 13px; color: var(--text-secondary); }
+.extra-val   { font-size: 14px; font-weight: 700; color: var(--text-primary); }
 </style>

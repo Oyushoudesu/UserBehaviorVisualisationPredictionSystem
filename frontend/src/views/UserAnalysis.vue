@@ -1,481 +1,300 @@
-<!-- UserAnalysis.vue
-用户分析页面，展示RFM散点图、用户生命周期饼图、用户画像雷达图、行为时段热力图
-风格与Dashboard.vue保持一致：Vue3 Composition API + Element Plus + ECharts + Axios
--->
 <template>
-  <div class="user-analysis">
-    <h1>用户分析</h1>
+  <div class="page">
 
     <!-- 筛选栏 -->
-    <el-card shadow="never" class="filter-card">
-      <el-row :gutter="20" align="middle">
-        <el-col :span="6">
-          <span class="filter-label">数据周期：</span>
-          <el-select v-model="selectedMonth" @change="loadAll" style="width: 140px">
-            <el-option label="第1月（1月）" :value="1" />
-            <el-option label="第2月（2月）" :value="2" />
-            <el-option label="第3月（3月）" :value="3" />
-            <el-option label="第4月（4月）" :value="4" />
-            <el-option label="第5月（5月）" :value="5" />
-            <el-option label="第6月（6月）" :value="6" />
-          </el-select>
-        </el-col>
-        <el-col :span="18">
-          <el-tag type="info" size="small">
-            基于 user_features_month{{ selectedMonth }}.csv 特征数据
-          </el-tag>
-        </el-col>
-      </el-row>
-    </el-card>
+    <div class="filter-bar">
+      <div class="filter-group">
+        <span class="filter-label">数据周期</span>
+        <el-select v-model="selectedMonth" @change="loadAll" style="width:150px" size="small">
+          <el-option v-for="m in 6" :key="m" :label="`第${m}月`" :value="m" />
+        </el-select>
+      </div>
+      <el-tag type="info" size="small" style="margin-left:4px">
+        基于 user_features_month{{ selectedMonth }}.csv
+      </el-tag>
+    </div>
 
-    <!-- 核心指标 -->
-    <el-row :gutter="20" class="metrics-row">
+    <!-- 指标卡 -->
+    <el-row :gutter="16" class="metrics-row">
       <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="metric-card">
-            <el-icon :size="40" color="#409EFF"><User /></el-icon>
-            <div class="metric-content">
-              <div class="metric-value">{{ stats.total_users?.toLocaleString() || '-' }}</div>
-              <div class="metric-label">分析用户数</div>
-            </div>
-          </div>
-        </el-card>
+        <div class="stat-card stat-blue">
+          <div class="stat-bg-icon"><el-icon :size="52" color="rgba(255,255,255,0.12)"><User /></el-icon></div>
+          <div class="stat-top"><div class="stat-icon-wrap"><el-icon :size="18" color="#fff"><User /></el-icon></div></div>
+          <div class="stat-value">{{ stats.total_users?.toLocaleString() || '—' }}</div>
+          <div class="stat-label">分析用户数</div>
+          <div class="stat-bar"><div class="stat-bar-fill" style="width:100%"></div></div>
+        </div>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="metric-card">
-            <el-icon :size="40" color="#67C23A"><Star /></el-icon>
-            <div class="metric-content">
-              <div class="metric-value">{{ stats.high_value_users?.toLocaleString() || '-' }}</div>
-              <div class="metric-label">高价值用户</div>
-            </div>
-          </div>
-        </el-card>
+        <div class="stat-card stat-green">
+          <div class="stat-bg-icon"><el-icon :size="52" color="rgba(255,255,255,0.12)"><Star /></el-icon></div>
+          <div class="stat-top"><div class="stat-icon-wrap"><el-icon :size="18" color="#fff"><Star /></el-icon></div></div>
+          <div class="stat-value">{{ stats.high_value_users?.toLocaleString() || '—' }}</div>
+          <div class="stat-label">高价值用户</div>
+          <div class="stat-bar"><div class="stat-bar-fill" style="width:65%"></div></div>
+        </div>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="metric-card">
-            <el-icon :size="40" color="#E6A23C"><Clock /></el-icon>
-            <div class="metric-content">
-              <div class="metric-value">{{ stats.avg_recency?.toFixed(0) || '-' }} 天</div>
-              <div class="metric-label">平均最近购买间隔</div>
-            </div>
-          </div>
-        </el-card>
+        <div class="stat-card stat-orange">
+          <div class="stat-bg-icon"><el-icon :size="52" color="rgba(255,255,255,0.12)"><Clock /></el-icon></div>
+          <div class="stat-top"><div class="stat-icon-wrap"><el-icon :size="18" color="#fff"><Clock /></el-icon></div></div>
+          <div class="stat-value">{{ stats.avg_recency?.toFixed(0) || '—' }} 天</div>
+          <div class="stat-label">平均最近购买间隔</div>
+          <div class="stat-bar"><div class="stat-bar-fill" style="width:55%"></div></div>
+        </div>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="metric-card">
-            <el-icon :size="40" color="#F56C6C"><Warning /></el-icon>
-            <div class="metric-content">
-              <div class="metric-value">{{ stats.churn_risk_users?.toLocaleString() || '-' }}</div>
-              <div class="metric-label">流失风险用户</div>
-            </div>
-          </div>
-        </el-card>
+        <div class="stat-card stat-red">
+          <div class="stat-bg-icon"><el-icon :size="52" color="rgba(255,255,255,0.12)"><Warning /></el-icon></div>
+          <div class="stat-top"><div class="stat-icon-wrap"><el-icon :size="18" color="#fff"><Warning /></el-icon></div></div>
+          <div class="stat-value">{{ stats.churn_risk_users?.toLocaleString() || '—' }}</div>
+          <div class="stat-label">流失风险用户</div>
+          <div class="stat-bar"><div class="stat-bar-fill" style="width:30%"></div></div>
+        </div>
       </el-col>
     </el-row>
 
-    <!-- 图表第一行：RFM散点图 + 用户生命周期饼图 -->
-    <el-row :gutter="20" class="charts-row">
+    <!-- 图表行1 -->
+    <el-row :gutter="16" class="charts-row">
       <el-col :span="14">
-        <el-card shadow="hover">
-          <template #header>
-            <div class="card-header">
-              <span>RFM 用户分层散点图</span>
-              <el-tooltip content="X轴：购买频率，Y轴：最近购买距今天数（越小越近），气泡大小：购买总量" placement="top">
-                <el-icon color="#909399"><QuestionFilled /></el-icon>
-              </el-tooltip>
+        <div class="chart-card">
+          <div class="chart-header" style="border-left-color:#3b82f6">
+            <div class="chart-header-left">
+              <span class="chart-dot" style="background:#3b82f6;box-shadow:0 0 6px rgba(59,130,246,0.6)"></span>
+              <span class="chart-title">RFM 用户分层散点图</span>
             </div>
-          </template>
-          <div v-loading="loading.rfm" id="rfm-chart" style="height: 420px"></div>
-        </el-card>
+            <el-tooltip content="X轴：购买频率，Y轴：距今天数（越小越近），气泡大小：购买总量" placement="top">
+              <span class="chart-badge" style="cursor:help">说明</span>
+            </el-tooltip>
+          </div>
+          <div v-loading="loading.rfm" id="rfm-chart" style="height:320px"></div>
+        </div>
       </el-col>
-
       <el-col :span="10">
-        <el-card shadow="hover">
-          <template #header>
-            <span>用户生命周期分布</span>
-          </template>
-          <div v-loading="loading.lifecycle" id="lifecycle-chart" style="height: 420px"></div>
-        </el-card>
+        <div class="chart-card">
+          <div class="chart-header" style="border-left-color:#a855f7">
+            <div class="chart-header-left">
+              <span class="chart-dot" style="background:#a855f7;box-shadow:0 0 6px rgba(168,85,247,0.6)"></span>
+              <span class="chart-title">用户生命周期分布</span>
+            </div>
+          </div>
+          <div v-loading="loading.lifecycle" id="lifecycle-chart" style="height:320px"></div>
+        </div>
       </el-col>
     </el-row>
 
-    <!-- 图表第二行：用户画像雷达图 + 行为时段热力图 -->
-    <el-row :gutter="20" class="charts-row">
+    <!-- 图表行2 -->
+    <el-row :gutter="16" class="charts-row">
       <el-col :span="10">
-        <el-card shadow="hover">
-          <template #header>
-            <div class="card-header">
-              <span>用户画像雷达图</span>
-              <el-radio-group v-model="radarSegment" size="small" @change="renderRadar">
-                <el-radio-button label="高价值用户" />
-                <el-radio-button label="普通用户" />
-              </el-radio-group>
+        <div class="chart-card">
+          <div class="chart-header" style="border-left-color:#10b981">
+            <div class="chart-header-left">
+              <span class="chart-dot" style="background:#10b981;box-shadow:0 0 6px rgba(16,185,129,0.6)"></span>
+              <span class="chart-title">用户画像雷达图</span>
             </div>
-          </template>
-          <div v-loading="loading.radar" id="radar-chart" style="height: 420px"></div>
-        </el-card>
+            <el-radio-group v-model="radarSegment" size="small" @change="renderRadar">
+              <el-radio-button label="高价值用户" />
+              <el-radio-button label="普通用户" />
+            </el-radio-group>
+          </div>
+          <div v-loading="loading.radar" id="radar-chart" style="height:320px"></div>
+        </div>
       </el-col>
-
       <el-col :span="14">
-        <el-card shadow="hover">
-          <template #header>
-            <span>行为时段热力图（小时 × 星期）</span>
-          </template>
-          <div v-loading="loading.heatmap" id="heatmap-chart" style="height: 420px"></div>
-        </el-card>
+        <div class="chart-card">
+          <div class="chart-header" style="border-left-color:#f59e0b">
+            <div class="chart-header-left">
+              <span class="chart-dot" style="background:#f59e0b;box-shadow:0 0 6px rgba(245,158,11,0.6)"></span>
+              <span class="chart-title">行为时段热力图（小时 × 星期）</span>
+            </div>
+          </div>
+          <div v-loading="loading.heatmap" id="heatmap-chart" style="height:320px"></div>
+        </div>
       </el-col>
     </el-row>
+
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { User, Star, Clock, Warning, QuestionFilled } from '@element-plus/icons-vue'
+import { ref, watch, onMounted } from 'vue'
+import { User, Star, Clock, Warning } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import axios from 'axios'
+import { useTheme } from '@/composables/useTheme'
 
 const API_BASE = 'http://localhost:8000/api/v1'
+const { isDark } = useTheme()
 
-// 状态
 const selectedMonth = ref(4)
 const radarSegment = ref('高价值用户')
 const stats = ref({})
-const radarData = ref(null)
+const loading = ref({ rfm: false, lifecycle: false, radar: false, heatmap: false })
+const cache = ref({ rfm: null, lifecycle: null, radar: null, heatmap: null })
 
-const loading = ref({
-  rfm: false,
-  lifecycle: false,
-  radar: false,
-  heatmap: false
-})
-
-// ECharts 实例缓存（用于 resize）
-let charts = {}
-
-// ============================================================================
-// 加载核心指标
-// ============================================================================
-const loadStats = async () => {
-  try {
-    const res = await axios.get(`${API_BASE}/visualization/user-stats`, {
-      params: { month: selectedMonth.value }
-    })
-    stats.value = res.data
-  } catch (error) {
-    console.error('加载用户统计失败:', error)
-  }
+const ecInit = (id) => {
+  const el = document.getElementById(id)
+  if (!el) return null
+  echarts.getInstanceByDom(el)?.dispose()
+  return echarts.init(el, isDark.value ? 'dark' : null)
 }
 
-// ============================================================================
-// RFM 散点图
-// ============================================================================
-const loadRFM = async () => {
-  loading.value.rfm = true
-  try {
-    const res = await axios.get(`${API_BASE}/visualization/user-rfm`, {
-      params: { month: selectedMonth.value }
-    })
-    const data = res.data
+const colorMap = { '高价值用户': '#3b82f6', '重要挽留用户': '#f59e0b', '新用户': '#10b981', '流失用户': '#f43f5e', '其他': '#94a3b8' }
 
-    const chart = echarts.init(document.getElementById('rfm-chart'))
-    charts.rfm = chart
-
-    // 按用户分层分组，每组一个 series
-    const seriesMap = {}
-    data.points.forEach(p => {
-      if (!seriesMap[p.segment]) seriesMap[p.segment] = []
-      seriesMap[p.segment].push([p.frequency, p.recency, p.purchase_count, p.user_id])
-    })
-
-    const colorMap = {
-      '高价值用户': '#409EFF',
-      '重要挽留用户': '#E6A23C',
-      '新用户': '#67C23A',
-      '流失用户': '#F56C6C',
-      '其他': '#909399'
-    }
-
-    const series = Object.entries(seriesMap).map(([name, points]) => ({
-      name,
-      type: 'scatter',
-      data: points,
-      symbolSize: val => Math.max(5, Math.min(30, val[2] / 20)),
-      itemStyle: { color: colorMap[name] || '#909399', opacity: 0.7 }
-    }))
-
-    chart.setOption({
-      tooltip: {
-        formatter: params => {
-          const [freq, rec, cnt, uid] = params.data
-          return `用户ID: ${uid}<br/>购买频率: ${freq}<br/>距今: ${rec}天<br/>购买总量: ${cnt}`
-        }
-      },
-      legend: { data: Object.keys(seriesMap), bottom: 0 },
-      xAxis: { name: '购买频率', nameLocation: 'center', nameGap: 30, splitLine: { show: false } },
-      yAxis: {
-        name: '距今天数',
-        nameLocation: 'center',
-        nameGap: 40,
-        inverse: true,
-        splitLine: { lineStyle: { type: 'dashed' } }
-      },
-      series
-    })
-  } catch (error) {
-    console.error('加载RFM数据失败:', error)
-  } finally {
-    loading.value.rfm = false
-  }
-}
-
-// ============================================================================
-// 用户生命周期饼图
-// ============================================================================
-const loadLifecycle = async () => {
-  loading.value.lifecycle = true
-  try {
-    const res = await axios.get(`${API_BASE}/visualization/user-segmentation`, {
-      params: { month: selectedMonth.value }
-    })
-    const data = res.data.segments
-
-    const chart = echarts.init(document.getElementById('lifecycle-chart'))
-    charts.lifecycle = chart
-
-    chart.setOption({
-      tooltip: {
-        trigger: 'item',
-        formatter: '{b}: {c} ({d}%)'
-      },
-      legend: {
-        orient: 'vertical',
-        left: 'left',
-        top: 'center'
-      },
-      color: ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C'],
-      series: [
-        {
-          type: 'pie',
-          radius: ['40%', '65%'],
-          center: ['60%', '50%'],
-          data,
-          emphasis: {
-            itemStyle: {
-              shadowBlur: 10,
-              shadowOffsetX: 0,
-              shadowColor: 'rgba(0, 0, 0, 0.5)'
-            }
-          },
-          label: {
-            formatter: '{b}\n{d}%'
-          }
-        }
-      ]
-    })
-  } catch (error) {
-    console.error('加载用户生命周期失败:', error)
-  } finally {
-    loading.value.lifecycle = false
-  }
-}
-
-// ============================================================================
-// 用户画像雷达图
-// ============================================================================
-const loadRadar = async () => {
-  loading.value.radar = true
-  try {
-    const res = await axios.get(`${API_BASE}/visualization/user-profile`, {
-      params: { month: selectedMonth.value }
-    })
-    radarData.value = res.data
-    renderRadar()
-  } catch (error) {
-    console.error('加载用户画像失败:', error)
-  } finally {
-    loading.value.radar = false
-  }
-}
-
-const renderRadar = () => {
-  if (!radarData.value) return
-  const data = radarData.value
-
-  const chart = charts.radar || echarts.init(document.getElementById('radar-chart'))
-  charts.radar = chart
-
-  const indicators = [
-    { name: '购买频率', max: 100 },
-    { name: '活跃天数', max: 100 },
-    { name: '领券率', max: 100 },
-    { name: '转化率', max: 100 },
-    { name: '商户多样性', max: 100 },
-    { name: '用户新鲜度', max: 100 }
-  ]
-
-  const segmentKey = radarSegment.value === '高价值用户' ? 'high_value' : 'normal'
-  const values = data[segmentKey] || [0, 0, 0, 0, 0, 0]
-
+const renderRFM = () => {
+  const data = cache.value.rfm
+  if (!data) return
+  const chart = ecInit('rfm-chart')
+  if (!chart) return
+  const seriesMap = {}
+  data.points.forEach(p => {
+    if (!seriesMap[p.segment]) seriesMap[p.segment] = []
+    seriesMap[p.segment].push([p.frequency, p.recency, p.purchase_count, p.user_id])
+  })
   chart.setOption({
-    tooltip: { trigger: 'item' },
-    legend: { data: [radarSegment.value], bottom: 0 },
-    radar: {
-      indicator: indicators,
-      splitNumber: 4,
-      axisName: { color: '#606266', fontSize: 12 }
-    },
-    series: [
-      {
-        type: 'radar',
-        data: [
-          {
-            name: radarSegment.value,
-            value: values,
-            areaStyle: { opacity: 0.25 },
-            itemStyle: { color: radarSegment.value === '高价值用户' ? '#409EFF' : '#67C23A' }
-          }
-        ]
-      }
-    ]
+    tooltip: { formatter: params => { const [freq, rec, cnt, uid] = params.data; return `用户ID: ${uid}<br/>频率: ${freq}<br/>距今: ${rec}天<br/>总量: ${cnt}` } },
+    legend: { data: Object.keys(seriesMap), bottom: 0, itemHeight: 10, textStyle: { fontSize: 11 } },
+    grid: { left: '3%', right: '4%', bottom: '14%', top: '4%', containLabel: true },
+    xAxis: { name: '购买频率', nameLocation: 'center', nameGap: 28, splitLine: { show: false } },
+    yAxis: { name: '距今天数', nameLocation: 'center', nameGap: 40, inverse: true, splitLine: { lineStyle: { type: 'dashed' } } },
+    series: Object.entries(seriesMap).map(([name, points]) => ({
+      name, type: 'scatter', data: points,
+      symbolSize: val => Math.max(5, Math.min(28, val[2] / 20)),
+      itemStyle: { color: colorMap[name] || '#94a3b8', opacity: 0.75 }
+    }))
   })
 }
 
-// ============================================================================
-// 行为时段热力图
-// ============================================================================
+const renderLifecycle = () => {
+  const data = cache.value.lifecycle
+  if (!data) return
+  const chart = ecInit('lifecycle-chart')
+  if (!chart) return
+  chart.setOption({
+    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+    legend: { orient: 'vertical', left: 'left', top: 'center', textStyle: { fontSize: 12 } },
+    color: ['#3b82f6', '#10b981', '#f59e0b', '#f43f5e'],
+    series: [{
+      type: 'pie', radius: ['40%', '65%'], center: ['60%', '50%'], data,
+      itemStyle: { borderRadius: 6, borderColor: 'transparent', borderWidth: 2 },
+      label: { formatter: '{b}\n{d}%', fontSize: 12 },
+      emphasis: { itemStyle: { shadowBlur: 12, shadowColor: 'rgba(0,0,0,0.2)' } }
+    }]
+  })
+}
+
+const renderRadar = () => {
+  const data = cache.value.radar
+  if (!data) return
+  const chart = ecInit('radar-chart')
+  if (!chart) return
+  const segKey = radarSegment.value === '高价值用户' ? 'high_value' : 'normal'
+  const values = data[segKey] || [0,0,0,0,0,0]
+  chart.setOption({
+    tooltip: { trigger: 'item' },
+    legend: { data: [radarSegment.value], bottom: 0, itemHeight: 10, textStyle: { fontSize: 11 } },
+    radar: {
+      indicator: [
+        { name: '购买频率', max: 100 }, { name: '活跃天数', max: 100 }, { name: '领券率', max: 100 },
+        { name: '转化率', max: 100 }, { name: '商户多样性', max: 100 }, { name: '用户新鲜度', max: 100 }
+      ],
+      splitNumber: 4
+    },
+    series: [{ type: 'radar', data: [{ name: radarSegment.value, value: values, areaStyle: { opacity: 0.25 }, itemStyle: { color: radarSegment.value === '高价值用户' ? '#3b82f6' : '#10b981' } }] }]
+  })
+}
+
+const renderHeatmap = () => {
+  const data = cache.value.heatmap
+  if (!data) return
+  const chart = ecInit('heatmap-chart')
+  if (!chart) return
+  const hours = Array.from({ length: 24 }, (_, i) => `${i}时`)
+  const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+  chart.setOption({
+    tooltip: { position: 'top', formatter: params => `${days[params.data[1]]} ${hours[params.data[0]]}<br/>行为次数: ${params.data[2]}` },
+    grid: { top: '5%', left: '10%', right: '5%', bottom: '18%' },
+    xAxis: { type: 'category', data: hours, splitArea: { show: true } },
+    yAxis: { type: 'category', data: days, splitArea: { show: true } },
+    visualMap: { min: 0, max: data.max_value || 100, calculable: true, orient: 'horizontal', left: 'center', bottom: '0%', inRange: { color: ['#e0f2fe', '#3b82f6', '#1d4ed8'] } },
+    series: [{ type: 'heatmap', data: data.matrix, emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.3)' } } }]
+  })
+}
+
+const loadStats = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/visualization/user-stats`, { params: { month: selectedMonth.value } })
+    stats.value = res.data
+  } catch (e) { console.error(e) }
+}
+
+const loadRFM = async () => {
+  loading.value.rfm = true
+  try {
+    const res = await axios.get(`${API_BASE}/visualization/user-rfm`, { params: { month: selectedMonth.value } })
+    cache.value.rfm = res.data; renderRFM()
+  } catch (e) { console.error(e) } finally { loading.value.rfm = false }
+}
+
+const loadLifecycle = async () => {
+  loading.value.lifecycle = true
+  try {
+    const res = await axios.get(`${API_BASE}/visualization/user-segmentation`, { params: { month: selectedMonth.value } })
+    cache.value.lifecycle = res.data.segments; renderLifecycle()
+  } catch (e) { console.error(e) } finally { loading.value.lifecycle = false }
+}
+
+const loadRadar = async () => {
+  loading.value.radar = true
+  try {
+    const res = await axios.get(`${API_BASE}/visualization/user-profile`, { params: { month: selectedMonth.value } })
+    cache.value.radar = res.data; renderRadar()
+  } catch (e) { console.error(e) } finally { loading.value.radar = false }
+}
+
 const loadHeatmap = async () => {
   loading.value.heatmap = true
   try {
-    const res = await axios.get(`${API_BASE}/visualization/behavior-heatmap`, {
-      params: { month: selectedMonth.value }
-    })
-    const data = res.data
-
-    const chart = echarts.init(document.getElementById('heatmap-chart'))
-    charts.heatmap = chart
-
-    const hours = Array.from({ length: 24 }, (_, i) => `${i}时`)
-    const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-
-    chart.setOption({
-      tooltip: {
-        position: 'top',
-        formatter: params => {
-          return `${days[params.data[1]]} ${hours[params.data[0]]}<br/>行为次数: ${params.data[2]}`
-        }
-      },
-      grid: { top: '10%', left: '10%', right: '5%', bottom: '15%' },
-      xAxis: {
-        type: 'category',
-        data: hours,
-        axisLabel: { fontSize: 11 },
-        splitArea: { show: true }
-      },
-      yAxis: {
-        type: 'category',
-        data: days,
-        splitArea: { show: true }
-      },
-      visualMap: {
-        min: 0,
-        max: data.max_value || 100,
-        calculable: true,
-        orient: 'horizontal',
-        left: 'center',
-        bottom: '0%',
-        inRange: { color: ['#EBF5FF', '#409EFF', '#003580'] }
-      },
-      series: [
-        {
-          type: 'heatmap',
-          data: data.matrix,
-          label: { show: false },
-          emphasis: {
-            itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0, 0, 0, 0.5)' }
-          }
-        }
-      ]
-    })
-  } catch (error) {
-    console.error('加载热力图失败:', error)
-  } finally {
-    loading.value.heatmap = false
-  }
+    const res = await axios.get(`${API_BASE}/visualization/behavior-heatmap`, { params: { month: selectedMonth.value } })
+    cache.value.heatmap = res.data; renderHeatmap()
+  } catch (e) { console.error(e) } finally { loading.value.heatmap = false }
 }
 
-// ============================================================================
-// 统一加载
-// ============================================================================
-const loadAll = () => {
-  loadStats()
-  loadRFM()
-  loadLifecycle()
-  loadRadar()
-  loadHeatmap()
-}
+const loadAll = () => { loadStats(); loadRFM(); loadLifecycle(); loadRadar(); loadHeatmap() }
 
-onMounted(() => {
-  loadAll()
-})
+watch(isDark, () => { renderRFM(); renderLifecycle(); renderRadar(); renderHeatmap() })
+
+onMounted(() => loadAll())
 </script>
 
 <style scoped>
-.user-analysis {
-  padding: 20px;
-}
+.page { padding: 16px 20px; background: var(--bg-page); min-height: 100%; }
 
-h1 {
-  margin-bottom: 20px;
-  color: #303133;
-}
+.filter-bar { display: flex; align-items: center; gap: 24px; background: var(--bg-filter); border: 1px solid var(--border); border-left: 3px solid #a855f7; border-radius: 10px; padding: 12px 18px; margin-bottom: 16px; box-shadow: 0 1px 6px rgba(0,0,0,0.05); }
+.filter-group { display: flex; align-items: center; gap: 8px; }
+.filter-label { font-size: 12px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
 
-.filter-card {
-  margin-bottom: 20px;
-  background: #f8f9fa;
-}
+.metrics-row { margin-bottom: 16px; }
+.stat-card { border-radius: 12px; padding: 14px 16px; position: relative; overflow: hidden; transition: transform 0.2s; }
+.stat-card:hover { transform: translateY(-2px); }
+.stat-blue   { background: linear-gradient(135deg, #2563eb, #06b6d4); box-shadow: 0 4px 16px rgba(37,99,235,0.3); }
+.stat-green  { background: linear-gradient(135deg, #059669, #10b981); box-shadow: 0 4px 16px rgba(5,150,105,0.3); }
+.stat-orange { background: linear-gradient(135deg, #d97706, #f59e0b); box-shadow: 0 4px 16px rgba(217,119,6,0.3); }
+.stat-red    { background: linear-gradient(135deg, #dc2626, #f43f5e); box-shadow: 0 4px 16px rgba(220,38,38,0.3); }
+.stat-bg-icon { position: absolute; right: -8px; bottom: -8px; pointer-events: none; }
+.stat-top { margin-bottom: 8px; }
+.stat-icon-wrap { width: 34px; height: 34px; background: rgba(255,255,255,0.2); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.stat-value { font-size: 22px; font-weight: 800; color: #fff; line-height: 1.2; margin-bottom: 3px; }
+.stat-label { font-size: 12px; color: rgba(255,255,255,0.75); margin-bottom: 10px; }
+.stat-bar { height: 3px; background: rgba(255,255,255,0.2); border-radius: 2px; overflow: hidden; }
+.stat-bar-fill { height: 100%; background: rgba(255,255,255,0.55); border-radius: 2px; }
 
-.filter-label {
-  font-size: 14px;
-  color: #606266;
-  margin-right: 8px;
-}
-
-.metrics-row {
-  margin-bottom: 20px;
-}
-
-.metric-card {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.metric-content {
-  flex: 1;
-}
-
-.metric-value {
-  font-size: 28px;
-  font-weight: bold;
-  color: #303133;
-  margin-bottom: 5px;
-}
-
-.metric-label {
-  font-size: 14px;
-  color: #909399;
-}
-
-.charts-row {
-  margin-bottom: 20px;
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
+.charts-row { margin-bottom: 16px; }
+.chart-card { background: var(--bg-card); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 8px rgba(0,0,0,0.06); transition: box-shadow 0.2s; }
+.chart-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.1); }
+.chart-header { display: flex; align-items: center; justify-content: space-between; padding: 11px 16px; border-bottom: 1px solid var(--border); border-left: 3px solid transparent; background: linear-gradient(90deg, rgba(0,0,0,0.02) 0%, transparent 100%); }
+.chart-header-left { display: flex; align-items: center; gap: 7px; }
+.chart-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.chart-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.chart-badge { font-size: 11px; padding: 2px 8px; background: var(--bg-page); color: var(--text-secondary); border-radius: 8px; font-weight: 500; }
 </style>

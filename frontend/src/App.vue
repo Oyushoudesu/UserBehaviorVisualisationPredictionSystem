@@ -44,6 +44,9 @@
         <div class="page-title">{{ currentPageTitle }}</div>
         <div class="topbar-right">
           <div class="topbar-time">{{ currentTime }}</div>
+          <button class="theme-toggle" @click="toggleTheme" :title="isDark ? '切换到亮色模式' : '切换到暗色模式'">
+            <el-icon :size="16"><component :is="isDark ? Sunny : Moon" /></el-icon>
+          </button>
           <el-dropdown trigger="click" @command="handleUserCommand">
             <div class="user-avatar">{{ avatarLetter }}</div>
             <template #dropdown>
@@ -73,11 +76,13 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { DataAnalysis, Odometer, Share, UserFilled, MagicStick, DataLine, Setting, SwitchButton } from '@element-plus/icons-vue'
+import { DataAnalysis, Odometer, Share, UserFilled, MagicStick, DataLine, Setting, SwitchButton, Sunny, Moon } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useTheme } from './composables/useTheme'
 
 const route = useRoute()
 const router = useRouter()
+const { isDark, toggle: toggleTheme, init: initTheme } = useTheme()
 
 // 用户信息
 const getStorage = (key) => localStorage.getItem(key) || sessionStorage.getItem(key) || ''
@@ -128,18 +133,45 @@ const updateTime = () => {
     hour: '2-digit', minute: '2-digit', second: '2-digit'
   })
 }
-onMounted(() => { updateTime(); timer = setInterval(updateTime, 1000) })
+onMounted(() => { updateTime(); timer = setInterval(updateTime, 1000); initTheme() })
 onUnmounted(() => clearInterval(timer))
 </script>
 
 <style>
+/* ===== CSS 自定义属性：亮色 / 暗色 ===== */
+:root {
+  --bg-page:      #f0f4f8;
+  --bg-card:      #ffffff;
+  --bg-filter:    #ffffff;
+  --bg-topbar:    rgba(255,255,255,0.92);
+  --bg-sidebar:   #0f172a;
+  --text-primary:   #1e293b;
+  --text-secondary: #64748b;
+  --text-muted:     #94a3b8;
+  --border:         #e2e8f0;
+  --split-line:     #f1f5f9;
+}
+html.dark {
+  --bg-page:      #0f172a;
+  --bg-card:      #1e293b;
+  --bg-filter:    #1e293b;
+  --bg-topbar:    rgba(15,23,42,0.96);
+  --bg-sidebar:   #080f1d;
+  --text-primary:   #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted:     #475569;
+  --border:         #334155;
+  --split-line:     #1e293b;
+}
+
 *, *::before, *::after { box-sizing: border-box; }
 body {
   margin: 0; padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
     'PingFang SC', 'Microsoft YaHei', sans-serif;
   -webkit-font-smoothing: antialiased;
-  background: #f1f5f9;
+  background: var(--bg-page);
+  transition: background 0.3s;
 }
 #app { min-height: 100vh; }
 
@@ -247,5 +279,32 @@ body {
 .user-avatar:hover { box-shadow: 0 0 0 3px rgba(59,130,246,0.25); }
 .dropdown-user-info { font-size: 12px; color: #94a3b8; }
 
-.content { flex: 1; background: #f1f5f9; }
+.content { flex: 1; background: var(--bg-page); transition: background 0.3s; }
+
+/* ── Theme toggle button ── */
+.theme-toggle {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.theme-toggle:hover {
+  background: var(--bg-page);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+}
+
+/* ── Dark mode: topbar ── */
+html.dark .topbar {
+  background: var(--bg-topbar);
+  border-bottom-color: var(--border);
+}
+html.dark .page-title { color: var(--text-primary); }
+html.dark .topbar-time { color: var(--text-muted); }
+
+/* ── Dark mode: sidebar ── */
+html.dark .sidebar { background: var(--bg-sidebar); }
 </style>
