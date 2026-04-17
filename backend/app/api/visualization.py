@@ -178,9 +178,9 @@ def get_user_profile(month: int = 4):
         raise HTTPException(status_code=404, detail=f"内存中未找到 {month} 月特征数据")
     dim_map = {
         'purchase_freq':  'frequency',
-        'active_days':    'active_days',
-        'coupon_rate':    'coupon_receive_rate',
-        'cvr':            'cvr',
+        'active_days':    'lifetime',          # 特征文件实际列名
+        'coupon_rate':    'coupon_use_rate',   # 实际列名（无 coupon_receive_rate）
+        'cvr':            'purchase_rate',     # 实际列名（无 cvr）
         'merchant_div':   'merchant_count',
         'recency_score':  'recency',
     }
@@ -334,6 +334,61 @@ def get_comparison_summary():
             "promotion": to_radar(promotion, promotion)
         }
     }
+
+# ============================================================================
+# 接口17: 分时段CVR
+# ============================================================================
+@router.get("/hourly-cvr")
+def get_hourly_cvr():
+    """获取每小时点击/购买/CVR数据"""
+    result = API_RESULT_CACHE.get('hourly_cvr')
+    if result is None:
+        raise HTTPException(status_code=503, detail="数据准备中")
+    return {"data": result}
+
+# ============================================================================
+# 接口18: 月度用户留存率
+# ============================================================================
+@router.get("/monthly-retention")
+def get_monthly_retention():
+    """获取4→5月、5→6月的用户留存/流失/新增数据"""
+    result = API_RESULT_CACHE.get('monthly_retention')
+    if not result:
+        raise HTTPException(status_code=503, detail="数据准备中")
+    return {"data": result}
+
+# ============================================================================
+# 接口16: 用户特征分布（活跃天数 / 商户多样性）
+# ============================================================================
+@router.get("/user-feature-dist")
+def get_user_feature_dist(month: int = 4):
+    """获取活跃天数 & 商户多样性的分布直方图数据"""
+    result = API_RESULT_CACHE.get('user_feature_dist', {}).get(month)
+    if not result:
+        raise HTTPException(status_code=404, detail=f"{month}月分布数据未就绪")
+    return result
+
+# ============================================================================
+# 接口14: 周内购买分布
+# ============================================================================
+@router.get("/weekday-distribution")
+def get_weekday_distribution():
+    """获取周一到周日的购买量分布"""
+    result = API_RESULT_CACHE.get('weekday_distribution')
+    if not result:
+        raise HTTPException(status_code=503, detail="数据准备中")
+    return {"data": result}
+
+# ============================================================================
+# 接口15: 总览大屏商户TOP10排名
+# ============================================================================
+@router.get("/merchant-ranking")
+def get_merchant_ranking():
+    """获取购买量TOP10商户（预计算缓存版）"""
+    result = API_RESULT_CACHE.get('merchant_ranking')
+    if not result:
+        raise HTTPException(status_code=503, detail="数据准备中")
+    return result
 
 # ============================================================================
 # 接口13：用户生命周期分布

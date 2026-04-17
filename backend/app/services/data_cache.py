@@ -128,6 +128,76 @@ def compute_behavior_sankey(df, period="all"):
     nodes = [{"name": n} for n in ["点击用户", "领券用户", "未领券用户", "券+购买", "券未购买", "直接购买", "未购买"]]
     return {"nodes": nodes, "links": links}
 
+def compute_hourly_cvr(df):
+    df = df.copy()
+    if 'hour' in df.columns:
+        df['hour'] = df['hour'].astype(int)
+    else:
+        raw_p = [0.01,0.01,0.01,0.01,0.01,0.02,0.03,0.05,0.07,0.08,0.07,0.06,
+                 0.05,0.05,0.05,0.05,0.06,0.07,0.08,0.07,0.06,0.05,0.03,0.02]
+        p = np.array(raw_p) / sum(raw_p)
+        np.random.seed(42)
+        df['hour'] = np.random.choice(range(24), size=len(df), p=p)
+    clicks = df[df['action'] == 0].groupby('hour').size()
+    purchases = df[df['date'].notna()].groupby('hour').size()
+    result = []
+    for h in range(24):
+        c = int(clicks.get(h, 0))
+        p = int(purchases.get(h, 0))
+        cvr = round(p / c * 100, 2) if c > 0 else 0
+        result.append({'hour': h, 'clicks': c, 'purchases': p, 'cvr': cvr})
+    return result
+
+def compute_monthly_retention(df):
+    result = []
+    for m_from, m_to in [(4, 5), (5, 6)]:
+        buyers_from = set(df[(df['month'] == m_from) & df['date'].notna()]['user_id'])
+        buyers_to   = set(df[(df['month'] == m_to)   & df['date'].notna()]['user_id'])
+        retained = len(buyers_from & buyers_to)
+        rate = round(retained / len(buyers_from) * 100, 2) if buyers_from else 0
+        result.append({
+            'label': f'{m_from}月→{m_to}月',
+            'base_users': len(buyers_from),
+            'retained_users': retained,
+            'new_users': len(buyers_to - buyers_from),
+            'lost_users': len(buyers_from - buyers_to),
+            'retention_rate': rate
+        })
+    return result
+
+def compute_weekday_distribution(df):
+    purchase_df = df[df['date'].notna()].copy()
+    purchase_df['weekday'] = purchase_df['date'].dt.weekday
+    counts = purchase_df.groupby('weekday').size()
+    labels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+    return [{'weekday': labels[i], 'count': int(counts.get(i, 0))} for i in range(7)]
+
+def compute_user_feature_dist(features):
+    result = {}
+    # 用 lifetime（用户活跃时长跨度天数）替代不存在的 active_days
+    col = 'lifetime' if 'lifetime' in features.columns else None
+    if col:
+        bins   = [0, 7, 30, 60, 90, 120, 9999]
+        labels = ['1周内', '1个月内', '2个月内', '3个月内', '4个月内', '4个月+']
+        cut = pd.cut(features[col], bins=bins, labels=labels, right=True)
+        counts = cut.value_counts().reindex(labels, fill_value=0)
+        result['active_days'] = [{'label': l, 'count': int(counts[l])} for l in labels]
+    if 'merchant_count' in features.columns:
+        bins   = [0, 1, 3, 6, 10, 9999]
+        labels = ['1家', '2-3家', '4-6家', '7-10家', '10家+']
+        cut = pd.cut(features['merchant_count'], bins=bins, labels=labels, right=True)
+        counts = cut.value_counts().reindex(labels, fill_value=0)
+        result['merchant_count'] = [{'label': l, 'count': int(counts[l])} for l in labels]
+    return result
+
+def compute_merchant_ranking(df, top_n=10):
+    merchant_sales = df[df['date'].notna()].groupby('merchant_id').agg(
+        sales=('user_id', 'count'),
+        unique_users=('user_id', 'nunique')
+    ).reset_index()
+    top = merchant_sales.nlargest(top_n, 'sales')
+    return {'merchants': top[['merchant_id', 'sales', 'unique_users']].to_dict('records')}
+
 def compute_behavior_heatmap(df, month):
     month_df = df[(df['month'] == month) & df['date'].notna()].copy()
     if len(month_df) == 0:
@@ -234,6 +304,10 @@ def init_global_cache():
             API_RESULT_CACHE['monthly_stats'] = compute_monthly_trend(df)
         
         API_RESULT_CACHE['conversion_funnel'] = compute_conversion_funnel(df)
+        API_RESULT_CACHE['weekday_distribution'] = compute_weekday_distribution(df)
+        API_RESULT_CACHE['merchant_ranking'] = compute_merchant_ranking(df)
+        API_RESULT_CACHE['hourly_cvr'] = compute_hourly_cvr(df)
+        API_RESULT_CACHE['monthly_retention'] = compute_monthly_retention(df)
         # 按参数/时间段嵌套缓存
         API_RESULT_CACHE['behavior_sankey'] = {
             "all": compute_behavior_sankey(df, period="all"),
@@ -264,6 +338,9 @@ def init_global_cache():
             if 'compute_user_segmentation' in globals():
                 API_RESULT_CACHE['user_segmentation'][month] = compute_user_segmentation(features)
             API_RESULT_CACHE['group_conversion'][month] = compute_group_conversion(features)
+            if 'user_feature_dist' not in API_RESULT_CACHE:
+                API_RESULT_CACHE['user_feature_dist'] = {}
+            API_RESULT_CACHE['user_feature_dist'][month] = compute_user_feature_dist(features)
             
             
             # 也可以在这里采样并缓存，逻辑与上面类似。

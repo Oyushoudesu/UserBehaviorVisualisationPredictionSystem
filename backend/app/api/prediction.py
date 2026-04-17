@@ -187,6 +187,70 @@ def get_batch_prediction_stats(pred_mode: str = "ensemble"):
 # 接口3: 特征重要性（XGBoost）
 # ============================================================================
 
+@router.get("/roc-curve")
+def get_roc_curve(pred_mode: str = "ensemble"):
+    """获取 ROC 曲线数据（FPR / TPR 采样点）"""
+    if not sliding_models or "feature_cols" not in model_meta:
+        raise HTTPException(status_code=503, detail="模型未加载，无法计算 ROC 曲线")
+    from sklearn.metrics import roc_curve, auc as sklearn_auc
+    features_df = _get_pred_df()
+    if "label" not in features_df.columns:
+        raise HTTPException(status_code=500, detail="缺少 label 列")
+    X = features_df[model_meta["feature_cols"]]
+    y_true = features_df["label"]
+    prob = _predict_proba(X, pred_mode)
+    fpr, tpr, _ = roc_curve(y_true, prob)
+    auc_val = float(sklearn_auc(fpr, tpr))
+    idx = np.linspace(0, len(fpr) - 1, min(80, len(fpr))).astype(int)
+    return {
+        "fpr": [round(float(fpr[i]), 4) for i in idx],
+        "tpr": [round(float(tpr[i]), 4) for i in idx],
+        "auc": round(auc_val, 4)
+    }
+
+@router.get("/confusion-matrix")
+def get_confusion_matrix_data(pred_mode: str = "ensemble"):
+    """获取混淆矩阵（TN / FP / FN / TP）"""
+    from sklearn.metrics import confusion_matrix
+    features_df = _get_pred_df()
+    if "label" not in features_df.columns:
+        raise HTTPException(status_code=500, detail="缺少 label 列")
+    X = features_df[model_meta["feature_cols"]]
+    y_true = features_df["label"]
+    prob = _predict_proba(X, pred_mode)
+    pred = (prob >= model_meta["optimal_threshold"]).astype(int)
+    tn, fp, fn, tp = confusion_matrix(y_true, pred).ravel()
+    total = int(tn + fp + fn + tp)
+    return {
+        "tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp),
+        "total": total,
+        "accuracy": round((tn + tp) / total, 4) if total else 0
+    }
+
+@router.get("/user-profile/{user_id}")
+def get_user_feature_profile(user_id: str):
+    """获取单用户 Top10 特征值及在全量数据中的百分位"""
+    if not sliding_models:
+        raise HTTPException(status_code=503, detail="模型未加载")
+    features_df = _get_pred_df().copy()
+    features_df["user_id"] = features_df["user_id"].astype(str)
+    user_row = features_df[features_df["user_id"] == user_id]
+    if len(user_row) == 0:
+        raise HTTPException(status_code=404, detail="未找到该用户特征数据")
+    feature_cols = model_meta["feature_cols"]
+    importance = sliding_models["xgb"].feature_importances_
+    top_idx = np.argsort(importance)[::-1][:10]
+    top_features = [feature_cols[i] for i in top_idx]
+    user_vals = user_row[top_features].iloc[0]
+    result = []
+    for feat in top_features:
+        val = float(user_vals[feat])
+        col = features_df[feat]
+        pct = round(float((col < val).mean() * 100), 1)
+        result.append({"feature": feat, "value": round(val, 4),
+                        "percentile": pct, "mean": round(float(col.mean()), 4)})
+    return {"features": result}
+
 @router.get("/feature-importance")
 def get_feature_importance(pred_mode: str = "ensemble", top_n: int = 20):
     """
