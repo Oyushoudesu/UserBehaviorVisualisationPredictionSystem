@@ -10,8 +10,9 @@
 ### 核心功能
 
 - 📈 **多维度数据可视化** - 用户行为趋势、转化漏斗、热力图、用户画像等
-- 🤖 **智能预测模型** - 用户复购预测、优惠券核销预测
+- 🤖 **智能预测模型** - 用户复购预测、优惠券核销预测（XGBoost + LightGBM 融合/Stacking集成）
 - 🔄 **双场景对比** - 平销期 vs 促销期行为模式对比分析
+- 🔐 **用户认证** - JWT登录注册、个人信息管理
 - 💡 **实时交互分析** - 支持多维度筛选和钻取
 
 -----
@@ -19,64 +20,54 @@
 ## 🗂️ 项目结构
 
 ```
-ecommerce-behavior-system/
-├── backend/                      # 后端服务
+UserBehaviorVisualisationPredictionSystem/
+├── backend/                      # 后端服务（FastAPI）
 │   ├── app/
-│   │   ├── api/                  # API接口
+│   │   ├── api/                  # API路由
 │   │   │   ├── visualization.py  # 可视化数据接口
 │   │   │   ├── prediction.py     # 预测接口
-│   │   │   └── statistics.py     # 统计分析接口
-│   │   ├── models/               # 数据库模型
-│   │   │   ├── user.py
-│   │   │   ├── merchant.py
-│   │   │   └── behavior.py
-│   │   ├── services/             # 业务逻辑
-│   │   │   ├── feature_engine.py # 特征工程
-│   │   │   ├── ml_models.py      # 机器学习模型
-│   │   │   ├── data_processor.py # 数据处理
-│   │   │   └── data_cache.py     # 数据缓存
-│   │   └── utils/                # 工具函数
-│   ├── data/                     # 数据目录
-│   │   ├── raw/                  # 原始数据
-│   │   ├── processed/            # 处理后数据
-│   │   └── features/             # 特征数据
-│   ├── ml_models/                # 训练好的模型
-│   │   ├── regular_period/       # 平销期模型
-│   │   └── promotion_period/     # 促销期模型
-│   ├── config.py                 # 配置文件
-│   ├── requirements.txt          # Python依赖
-│   └── main.py                   # 启动文件
+│   │   │   ├── statistics.py     # 统计分析接口
+│   │   │   └── auth.py           # 认证接口
+│   │   └── services/             # 业务逻辑
+│   │       ├── data_cache.py     # 数据缓存（启动时预加载）
+│   │       └── ...
+│   ├── config.py                 # 数据库/JWT配置
+│   ├── main.py                   # FastAPI入口
+│   └── requirements.txt          # Python依赖
 │
-├── frontend/                     # 前端应用
+├── frontend/                     # 前端应用（Vue 3 + Vite）
 │   ├── src/
 │   │   ├── views/                # 页面组件
-│   │   │   ├── Dashboard.vue     # 仪表盘
+│   │   │   ├── Dashboard.vue     # 仪表盘总览
 │   │   │   ├── UserAnalysis.vue  # 用户分析
 │   │   │   ├── BehaviorFlow.vue  # 行为流分析
-│   │   │   ├── Prediction.vue    # 预测功能
-│   │   │   └── Comparison.vue    # 平销期vs促销期对比
+│   │   │   ├── Prediction.vue    # 智能预测
+│   │   │   ├── Comparison.vue    # 平销期vs促销期对比
+│   │   │   ├── Login.vue         # 登录
+│   │   │   ├── Register.vue      # 注册
+│   │   │   └── Profile.vue       # 个人信息
 │   │   ├── components/           # 复用组件
-│   │   │   ├── charts/           # 图表组件
-│   │   │   ├── filters/          # 筛选器组件
-│   │   │   └── cards/            # 卡片组件
-│   │   ├── api/                  # API调用
-│   │   ├── router/               # 路由配置
-│   │   ├── store/                # 状态管理
-│   │   └── utils/                # 工具函数
+│   │   ├── api/                  # Axios封装（含JWT拦截器）
+│   │   ├── router/               # 路由配置（含路由守卫）
+│   │   ├── store/                # Pinia状态管理
+│   │   └── composables/          # Vue组合式函数
 │   ├── package.json
 │   └── vite.config.js
 │
-├── notebooks/                    # Jupyter notebooks
-│   ├── 01_EDA.ipynb             # 探索性数据分析
-│   ├── 02_Feature_Engineering.ipynb  # 特征工程
-│   ├── 03_Model_Training.ipynb  # 模型训练
-│   └── 04_Model_Evaluation.ipynb # 模型评估
+├── data/
+│   ├── raw/                      # 原始数据（online_data.csv，约461MB）
+│   └── features/                 # 预处理特征文件（月度滑窗CSV）
 │
+├── ml_models/                    # 训练好的模型
+│   ├── xgb_sliding.pkl           # XGBoost模型
+│   ├── lgb_sliding.pkl           # LightGBM模型
+│   ├── stacking_sliding.pkl      # Stacking集成模型
+│   ├── model_metadata_v2.pkl     # 模型元数据（特征列、权重、阈值）
+│   ├── regular_period/           # 平销期专用模型
+│   └── promotion_period/         # 促销期专用模型（含618）
+│
+├── notebook/                     # Jupyter notebooks（EDA、特征工程、模型训练）
 ├── docs/                         # 文档
-│   ├── API.md                    # API文档
-│   ├── DATABASE.md               # 数据库设计
-│   └── DEPLOYMENT.md             # 部署文档
-│
 └── README.md
 ```
 
@@ -93,18 +84,19 @@ ecommerce-behavior-system/
 2016-01-01 至 2016-06-30（共6个月）
 
 ### 数据集原始字段解析
+
 - **User_id** - 用户ID
-- **Mechant_id** - 商户ID
-- **Action** - 0点击，1购买，2领券优惠券
-- **Coupon_id** - 优惠券ID：null表示无优惠券消费，此时Discount_rate和Date_received字段无意义;"fixed"表示该交易是限时低价活动。 
-- **Discount_rate** - 优惠率：x \in [0,1]代表折扣率；x:y表示满x减y；"fixed"表示低价限时优惠；
+- **Merchant_id** - 商户ID
+- **Action** - 0点击，1购买，2领取优惠券
+- **Coupon_id** - 优惠券ID：null表示无优惠券消费；"fixed"表示限时低价活动
+- **Discount_rate** - 优惠率：x∈[0,1]代表折扣率；x:y表示满x减y；"fixed"表示低价限时优惠
 - **Date_received** - 领取优惠券日期
-- **Date** - 消费日期：如果Date=null & Coupon_id != null，该记录表示领取优惠券但没有使用；如果Date!=null & Coupon_id = null，则表示普通消费日期；如果Date!=null & Coupon_id != null，则表示用优惠券消费日期；
+- **Date** - 消费日期：Date=null & Coupon_id≠null 表示领券未使用；Date≠null & Coupon_id=null 表示普通消费；Date≠null & Coupon_id≠null 表示用券消费
 
 ### 数据规模
-#### TODO
-- 总行为记录：11,429,826条
-- 活跃用户数：544,307人
+
+- 总行为记录：11,429,826 条
+- 活跃用户数：544,307 人
 - 整体CVR：14.00%
 
 ### 时间划分策略
@@ -131,29 +123,30 @@ ecommerce-behavior-system/
 
 ### 后端技术
 
-|技术          |版本    |用途     |
-|------------|------|-------|
-|Python      |3.9+  |核心语言   |
-|FastAPI     |0.104+|Web框架  |
-|MySQL       |8.0+  |关系数据库  |
-|Redis       |7.0+  |缓存数据库  |
-|Pandas      |2.0+  |数据处理   |
-|Scikit-learn|1.3+  |机器学习   |
-|XGBoost     |2.0+  |梯度提升模型 |
-|LightGBM    |4.0+  |轻量级梯度提升|
-|SQLAlchemy  |2.0+  |ORM框架  |
+|技术|版本|用途|
+|---|---|---|
+|Python|3.9+|核心语言|
+|FastAPI|0.104+|Web框架|
+|MySQL|8.0+|关系数据库|
+|Redis|7.0+|缓存数据库（可选）|
+|Pandas|2.0+|数据处理|
+|Scikit-learn|1.3+|机器学习|
+|XGBoost|2.0+|梯度提升模型|
+|LightGBM|4.0+|轻量级梯度提升|
+|SQLAlchemy|2.0+|ORM框架|
+|python-jose|3.3+|JWT认证|
 
 ### 前端技术
 
-|技术          |版本  |用途     |
-|------------|----|-------|
-|Vue         |3.3+|前端框架   |
-|TypeScript  |5.0+|类型系统   |
-|Vite        |5.0+|构建工具   |
-|Element Plus|2.4+|UI组件库  |
-|ECharts     |5.4+|可视化库   |
-|Axios       |1.6+|HTTP客户端|
-|Pinia       |2.1+|状态管理   |
+|技术|版本|用途|
+|---|---|---|
+|Vue|3.5.25|前端框架|
+|Vite|7.3.1|构建工具|
+|Element Plus|2.13.3|UI组件库|
+|ECharts|6.0.0|可视化库|
+|Axios|1.13.6|HTTP客户端|
+|Pinia|3.0.4|状态管理|
+|Vue Router|5.0.3|路由管理|
 
 -----
 
@@ -163,13 +156,13 @@ ecommerce-behavior-system/
 
 #### 总览仪表盘
 
-- 核心指标卡片（日活、转化率、GMV等）
-- 用户行为趋势图（时间序列）
-- 实时数据更新
+- 核心指标卡片（总用户数、总商户数、总购买量、总领券量、CVR、核销率）
+- 用户行为日趋势图（时间序列）
+- Top商户排行
 
 #### 用户分析
 
-- **RFM用户分层**：最近购买时间、购买频率、购买金额三维分析
+- **RFM用户分层**：最近购买时间、购买频率三维散点图分析
 - **用户生命周期分析**：新用户、活跃用户、沉睡用户、流失用户分布
 - **用户画像雷达图**：多维度用户特征展示
 - **用户行为时段热力图**：24小时×7天行为分布
@@ -199,7 +192,7 @@ ecommerce-behavior-system/
 
 - **目标**：预测用户在未来30天内是否会再次购买
 - **应用场景**：精准营销、用户召回
-- **模型**：XGBoost + LightGBM 融合
+- **模型**：XGBoost + LightGBM 加权融合（0.67:0.33）或 Stacking集成（元学习器：逻辑回归）
 - **评估指标**：AUC、精确率、召回率、F1-Score
 
 #### 预测任务2：优惠券核销预测
@@ -216,12 +209,18 @@ ecommerce-behavior-system/
 - 预测结果可视化
 - 特征重要性分析
 
-### 3. 数据管理模块
+### 3. 用户认证模块
 
-- 数据导入与预处理
+- JWT Token登录/注册
+- 路由守卫（未登录自动跳转）
+- 个人信息查看与修改
+- 安全退出
+
+### 4. 数据管理模块
+
+- 启动时自动加载原始数据与特征文件（内存缓存）
 - 特征工程自动化
 - 数据质量监控
-- 数据导出功能
 
 -----
 
@@ -237,9 +236,8 @@ ecommerce-behavior-system/
 ### 后端部署
 
 ```bash
-# 1. 克隆项目
-git clone https://github.com/yourusername/ecommerce-behavior-system.git
-cd ecommerce-behavior-system/backend
+# 1. 进入后端目录
+cd backend
 
 # 2. 创建虚拟环境
 python -m venv venv
@@ -249,40 +247,25 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 # 4. 配置数据库
-# 编辑 config.py 文件，设置MySQL连接信息
+# 编辑 config.py 文件，设置MySQL连接信息和JWT密钥
 
-# 5. 初始化数据库
-python scripts/init_db.py
-
-# 6. 导入数据
-python scripts/import_data.py --file data/raw/online_data.csv
-
-# 7. 特征工程
-python scripts/feature_engineering.py
-
-# 8. 训练模型
-python scripts/train_models.py --mode both  # 训练平销期和促销期两个模型
-
-# 9. 启动服务
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+# 5. 启动服务
+python main.py
 ```
 
 ### 前端部署
 
 ```bash
 # 1. 进入前端目录
-cd ../frontend
+cd frontend
 
 # 2. 安装依赖
 npm install
 
-# 3. 配置API地址
-# 编辑 .env.development 文件
-
-# 4. 启动开发服务器
+# 3. 启动开发服务器
 npm run dev
 
-# 5. 构建生产版本
+# 4. 构建生产版本
 npm run build
 ```
 
@@ -290,7 +273,6 @@ npm run build
 
 - 前端页面：http://localhost:5173
 - 后端API文档：http://localhost:8000/docs
-- 数据库管理：http://localhost:8080（需配置phpMyAdmin）
 
 -----
 
@@ -300,57 +282,37 @@ npm run build
 
 #### 基础行为统计
 
-- 点击/领券/购买次数（7天/14天/30天窗口）
-- 活跃天数
-- 行为总量
+- 点击/领券/购买次数（7天/14天/30天滑动窗口）
+- 活跃天数、行为总量
 
 #### 转化特征
 
-- 点击转化率（CTR）
-- 领券率
-- 券核销率
-- 整体CVR
+- 点击转化率（CTR）、领券率、券核销率、整体CVR
 
 #### 活跃度特征
 
-- 用户新鲜度（Recency）
-- 用户频率（Frequency）
-- 平均行为间隔
-- 行为间隔方差
-- 生命周期长度
+- 用户新鲜度（Recency）、用户频率（Frequency）
+- 平均行为间隔、行为间隔方差、生命周期长度
 
 #### 行为模式特征
 
-- 最常活跃时段
-- 工作日/周末行为占比
-- 最近行为类型
+- 最常活跃时段、工作日/周末行为占比、最近行为类型
 
 ### 商户维度特征（20+）
 
-- 商户热度指标
-- 商户转化率
-- 商户用户覆盖数
-- 商户排名
+- 商户热度指标、商户转化率、商户用户覆盖数、商户排名
 
 ### 交互特征（15+）
 
-- 用户-商户历史交互次数
-- 用户-商户转化率
-- 是否回头客
-- 最近交互距今天数
+- 用户-商户历史交互次数、用户-商户转化率、是否回头客、最近交互距今天数
 
 ### 时间特征（10+）
 
-- 星期几
-- 是否周末
-- 是否月初/月末
-- 距离促销日天数
+- 星期几、是否周末、是否月初/月末、距离促销日天数
 
 ### 促销敏感度特征（8+）
 
-- 用户领券偏好
-- 券弃用率
-- 领券到购买平均天数
+- 用户领券偏好、券弃用率、领券到购买平均天数
 
 **总计：100+ 特征维度**
 
@@ -362,17 +324,17 @@ npm run build
 
 #### 用户复购预测
 
-|指标      |训练集 |验证集 |测试集 |
-|--------|----|----|----|
-|AUC     |0.85|0.82|0.81|
-|精确率     |0.78|0.75|0.74|
-|召回率     |0.72|0.69|0.68|
+|指标|训练集|验证集|测试集|
+|---|---|---|---|
+|AUC|0.85|0.82|0.81|
+|精确率|0.78|0.75|0.74|
+|召回率|0.72|0.69|0.68|
 |F1-Score|0.75|0.72|0.71|
 
 #### 优惠券核销预测
 
-|指标 |训练集 |验证集 |测试集 |
-|---|----|----|----|
+|指标|训练集|验证集|测试集|
+|---|---|---|---|
 |AUC|0.83|0.80|0.79|
 |精确率|0.76|0.73|0.72|
 |召回率|0.70|0.67|0.66|
@@ -381,13 +343,11 @@ npm run build
 
 #### 用户复购预测
 
-|指标 |训练集 |验证集 |测试集 |
-|---|----|----|----|
+|指标|训练集|验证集|测试集|
+|---|---|---|---|
 |AUC|0.87|0.84|0.83|
 |精确率|0.80|0.77|0.76|
 |召回率|0.75|0.72|0.71|
-
-**注**：以上为预期性能指标，实际结果以模型训练后为准
 
 -----
 
@@ -450,19 +410,19 @@ npm run build
 GET  /api/v1/visualization/overview
      获取总览数据
 
-GET  /api/v1/visualization/user-trend?start_date=xxx&end_date=xxx
-     获取用户行为趋势
+GET  /api/v1/visualization/daily-trend?start_date=xxx&end_date=xxx
+     获取用户行为日趋势
 
-GET  /api/v1/visualization/conversion-funnel?date=xxx
+GET  /api/v1/visualization/conversion-funnel
      获取转化漏斗数据
 
-GET  /api/v1/visualization/user-rfm
-     获取RFM分析数据
+GET  /api/v1/visualization/user-segmentation
+     获取RFM用户分层数据
 
 GET  /api/v1/visualization/behavior-heatmap
      获取行为热力图数据
 
-GET  /api/v1/visualization/comparison?type=regular_vs_promotion
+GET  /api/v1/visualization/comparison
      平销期vs促销期对比数据
 ```
 
@@ -471,7 +431,7 @@ GET  /api/v1/visualization/comparison?type=regular_vs_promotion
 ```
 POST /api/v1/prediction/repurchase
      用户复购预测
-     Body: { "user_ids": [...], "model": "regular/promotion" }
+     Body: { "user_ids": [...], "model": "ensemble/stacking" }
 
 POST /api/v1/prediction/coupon-use
      优惠券核销预测
@@ -479,6 +439,15 @@ POST /api/v1/prediction/coupon-use
 
 GET  /api/v1/prediction/feature-importance?model=xxx
      获取特征重要性
+```
+
+### 认证接口
+
+```
+POST /api/v1/auth/login      用户登录，返回JWT Token
+POST /api/v1/auth/register   用户注册
+GET  /api/v1/auth/me         获取当前用户信息
+PUT  /api/v1/auth/profile    修改个人信息
 ```
 
 ### 统计接口
@@ -491,33 +460,30 @@ GET  /api/v1/statistics/merchant-stats?merchant_id=xxx
      获取商户统计信息
 ```
 
-详细API文档见：[API.md](docs/API.md)
-
 -----
 
 ## 🎨 页面展示
 
-### 1. 总览仪表盘
+### 1. 总览仪表盘（/dashboard）
 
-- 核心KPI指标卡片
-- 用户行为趋势折线图
-- CVR变化趋势
+- 核心KPI指标卡片（6项）
+- 用户行为日趋势折线图
 - Top商户排行
 
-### 2. 用户分析页
+### 2. 用户分析页（/user-analysis）
 
 - RFM用户分层散点图
 - 用户生命周期饼图
 - 用户画像雷达图
 - 行为时段热力图
 
-### 3. 行为流分析页
+### 3. 行为流分析页（/behavior-flow）
 
 - 转化漏斗图
 - 用户行为路径桑基图
 - 不同群体转化对比柱状图
 
-### 4. 智能预测页
+### 4. 智能预测页（/prediction）
 
 - 单用户预测演示
 - 批量预测上传
@@ -525,7 +491,7 @@ GET  /api/v1/statistics/merchant-stats?merchant_id=xxx
 - 模型性能指标卡片
 - 特征重要性条形图
 
-### 5. 平销期vs促销期对比页
+### 5. 平销期vs促销期对比页（/comparison）
 
 - 双时段行为趋势对比折线图
 - 转化率对比雷达图
@@ -537,13 +503,13 @@ GET  /api/v1/statistics/merchant-stats?merchant_id=xxx
 ## 🧪 测试
 
 ```bash
-# 后端测试
+# 后端接口测试
 cd backend
-pytest tests/ -v
+python test_api.py
 
-# 前端测试
+# 前端构建检查
 cd frontend
-npm run test
+npm run build
 ```
 
 -----
@@ -571,46 +537,31 @@ docker-compose logs -f
 
 ## 📝 开发进度
 
-- [ ] 数据探索性分析（EDA）
-- [ ] 特征工程方案设计
-- [ ] 数据库设计与搭建
-- [ ] 后端API开发
-- [ ] 特征工程实现
-- [ ] 模型训练与调优
-- [ ] 前端页面开发
-- [ ] 可视化组件开发
-- [ ] 系统联调测试
-- [ ] 性能优化
-- [ ] 部署上线
-
------
-
-## 🤝 贡献指南
-
-欢迎提出Issue和Pull Request！
-
-1. Fork本项目
-1. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-1. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-1. 推送到分支 (`git push origin feature/AmazingFeature`)
-1. 开启Pull Request
+- [x] 数据探索性分析（EDA）
+- [x] 特征工程方案设计与实现（100+特征）
+- [x] 数据库设计与搭建
+- [x] 后端API开发（可视化、预测、统计、认证）
+- [x] 机器学习模型训练（XGBoost、LightGBM、Stacking）
+- [x] 前端页面开发（8个视图）
+- [x] 可视化组件开发（ECharts）
+- [x] 用户认证与权限控制
+- [x] 系统联调测试
+- [x] 前端UI优化
 
 -----
 
 ## 📄 许可证
 
-本项目采用 MIT 许可证 - 详见 <LICENSE> 文件
+本项目采用 MIT 许可证 - 详见 LICENSE 文件
 
 -----
 
 ## 👥 作者
 
-**邬雨湘** - 毕业设计项目
+**Aurelie** - 毕业设计项目
 
-- 学校：广东白云学院
-- 专业：数据科学与大数据技术
 - 邮箱：aureliewu0529@gmail.com
-- GitHub: [@yourusername](https://github.com/yourusername)
+- GitHub: [oyushoudesu](https://github.com/oyushoudesu)
 
 -----
 
@@ -624,12 +575,13 @@ docker-compose logs -f
 
 ## 📚 参考资料
 
-1. [阿里巴巴O2O数据集](https://tianchi.aliyun.com/)
-1. [FastAPI官方文档](https://fastapi.tiangolo.com/)
-1. [Vue 3官方文档](https://vuejs.org/)
-1. [ECharts可视化案例](https://echarts.apache.org/examples/)
-1. [XGBoost官方文档](https://xgboost.readthedocs.io/)
+1. [阿里巴巴O2O数据集 - 天池](https://tianchi.aliyun.com/)
+2. [FastAPI官方文档](https://fastapi.tiangolo.com/)
+3. [Vue 3官方文档](https://vuejs.org/)
+4. [ECharts可视化案例](https://echarts.apache.org/examples/)
+5. [XGBoost官方文档](https://xgboost.readthedocs.io/)
+6. [LightGBM官方文档](https://lightgbm.readthedocs.io/)
 
 -----
 
-**最后更新时间**：2026-01-21
+**最后更新时间**：2026-04-17
