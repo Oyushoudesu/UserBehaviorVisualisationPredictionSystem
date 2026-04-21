@@ -62,7 +62,7 @@
           </div>
           <div class="logo-ring"></div>
         </div>
-        <h2>电商用户行为分析系统</h2>
+        <h2>电商用户全链路数据的可视化系统</h2>
         <p class="subtitle">基于阿里电商的智能分析平台</p>
       </div>
 
