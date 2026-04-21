@@ -235,7 +235,8 @@ const renderRadar = () => {
         { name: '购买频率', max: 100 }, { name: '活跃天数', max: 100 }, { name: '领券率', max: 100 },
         { name: '转化率', max: 100 }, { name: '商户多样性', max: 100 }, { name: '用户新鲜度', max: 100 }
       ],
-      splitNumber: 4,
+      radius: '60%',
+      splitNumber: 5,
       axisName: { fontSize: 11, color: '#64748b' }
     },
     series: [{

@@ -302,18 +302,32 @@ const loadWeekdayDist = async () => {
     const data = res.data.data
     const chart = echarts.init(document.getElementById('weekday-chart'))
     const days = data.map(d => d.weekday)
-    const counts = data.map(d => d.count)
-    const colors = ['#3b82f6','#10b981','#f59e0b','#f43f5e','#8b5cf6','#ec4899','#06b6d4']
+    const withCoupon = data.map(d => d.with_coupon ?? 0)
+    const withoutCoupon = data.map(d => d.without_coupon ?? 0)
     chart.setOption({
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: '{b}: <b>{c}</b> 次购买' },
-      grid: { left: '3%', right: '4%', bottom: '8%', top: '8%', containLabel: true },
+      tooltip: {
+        trigger: 'axis', axisPointer: { type: 'shadow' },
+        formatter: params => {
+          const total = params.reduce((s, p) => s + (p.value || 0), 0)
+          return `${params[0].name}<br/>` +
+            params.map(p => `${p.marker}${p.seriesName}: <b>${p.value}</b>`).join('<br/>') +
+            `<br/>总计: <b>${total}</b> 次购买`
+        }
+      },
+      legend: { data: ['使用优惠券购买', '未使用优惠券购买'], bottom: 0, itemHeight: 10, textStyle: { color: '#64748b', fontSize: 12 } },
+      grid: { left: '3%', right: '4%', bottom: '14%', top: '8%', containLabel: true },
       xAxis: { type: 'category', data: days, axisLabel: { color: '#334155', fontSize: 12 }, axisLine: { lineStyle: { color: '#e2e8f0' } } },
       yAxis: { type: 'value', splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } }, axisLabel: { color: '#94a3b8', fontSize: 11 } },
-      series: [{
-        type: 'bar', data: counts.map((v, i) => ({ value: v, itemStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:colors[i]},{offset:1,color:colors[i]+'88'}]), borderRadius: [5,5,0,0] } })),
-        barMaxWidth: 36,
-        label: { show: true, position: 'top', color: '#64748b', fontSize: 11, formatter: '{c}' }
-      }]
+      series: [
+        {
+          name: '使用优惠券购买', type: 'bar', stack: 'total', data: withCoupon, barMaxWidth: 36,
+          itemStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'#f43f5e'},{offset:1,color:'#fb7185'}]) }
+        },
+        {
+          name: '未使用优惠券购买', type: 'bar', stack: 'total', data: withoutCoupon, barMaxWidth: 36,
+          itemStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'#3b82f6'},{offset:1,color:'#60a5fa'}]), borderRadius: [5,5,0,0] }
+        }
+      ]
     })
   } catch (e) { console.error(e) }
 }

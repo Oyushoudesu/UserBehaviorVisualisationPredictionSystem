@@ -198,10 +198,11 @@ def get_user_profile(month: int = 4):
     normal_mask = ~high_mask
 
     def normalize_col(series, invert=False):
-        min_v, max_v = series.min(), series.max()
-        if max_v == min_v:
-            return pd.Series([50.0] * len(series), index=series.index)
-        norm = (series - min_v) / (max_v - min_v) * 100
+        # 使用百分位排名归一化（rank-based），避免极值压缩分布
+        s = series.astype(float)
+        if s.nunique() <= 1:
+            return pd.Series([50.0] * len(s), index=s.index)
+        norm = s.rank(method='average', pct=True) * 100
         return (100 - norm) if invert else norm
 
     result = {'high_value': [], 'normal': []}
@@ -312,11 +313,26 @@ def get_comparison_summary():
         coupon_rate = round(coupons / (purchases + coupons) * 100, 2) if (purchases + coupons) > 0 else 0
         daily_purchases = round(purchases / max(total_days, 1), 0)
 
+        # 核销率：使用优惠券购买数 / 领券数
+        coupon_used = int(((pdf['date'].notna()) & (pdf['coupon_id'].notna())).sum())
+        redemption_rate = round(coupon_used / coupons * 100, 2) if coupons > 0 else 0
+
+        # 复购率：购买 ≥2 次的用户占活跃用户比例
+        buyers = pdf[pdf['date'].notna()]
+        if len(buyers) > 0 and active_users > 0:
+            user_purchase_counts = buyers.groupby('user_id').size()
+            repeat_users = int((user_purchase_counts >= 2).sum())
+            repurchase_rate = round(repeat_users / active_users * 100, 2)
+        else:
+            repurchase_rate = 0
+
         return {
             "cvr": cvr,
             "coupon_rate": coupon_rate,
             "daily_purchases": int(daily_purchases),
-            "active_users": active_users
+            "active_users": active_users,
+            "redemption_rate": redemption_rate,
+            "repurchase_rate": repurchase_rate,
         }
 
     regular_df   = df[df['month'] <= 4]
@@ -327,20 +343,25 @@ def get_comparison_summary():
 
     changes = {k: round(promotion[k] - regular[k], 2) for k in regular}
 
-    def to_radar(stats, ref):
-        result = []
-        for k in ['cvr', 'daily_purchases', 'coupon_rate', 'active_users', 'cvr', 'coupon_rate']:
-            max_v = max(stats.get(k, 0), ref.get(k, 1), 1)
-            result.append(round(stats.get(k, 0) / max_v * 100, 1))
-        return result
+    # 雷达图维度顺序（与前端 indicator 对齐）：转化率 / 购买量 / 领券率 / 活跃用户 / 复购率 / 核销率
+    radar_keys = ['cvr', 'daily_purchases', 'coupon_rate', 'active_users', 'repurchase_rate', 'redemption_rate']
+
+    # 每一维以"两期最大值 * 1.25"为上限，使较大方落在 80 附近，两条折线都有可读空间
+    caps = {}
+    for k in radar_keys:
+        cap = max(regular.get(k, 0), promotion.get(k, 0)) * 1.25
+        caps[k] = cap if cap > 0 else 1
+
+    def to_radar(stats):
+        return [round(stats.get(k, 0) / caps[k] * 100, 1) for k in radar_keys]
 
     return {
         "regular": regular,
         "promotion": promotion,
         "changes": changes,
         "radar": {
-            "regular":   to_radar(regular, promotion),
-            "promotion": to_radar(promotion, promotion)
+            "regular":   to_radar(regular),
+            "promotion": to_radar(promotion)
         }
     }
 

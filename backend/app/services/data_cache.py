@@ -195,9 +195,15 @@ def compute_monthly_retention(df):
 def compute_weekday_distribution(df):
     purchase_df = df[df['date'].notna()].copy()
     purchase_df['weekday'] = purchase_df['date'].dt.weekday
-    counts = purchase_df.groupby('weekday').size()
+    with_coupon = purchase_df[purchase_df['coupon_id'].notna()].groupby('weekday').size()
+    without_coupon = purchase_df[purchase_df['coupon_id'].isna()].groupby('weekday').size()
     labels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-    return [{'weekday': labels[i], 'count': int(counts.get(i, 0))} for i in range(7)]
+    return [{
+        'weekday': labels[i],
+        'count': int(with_coupon.get(i, 0) + without_coupon.get(i, 0)),
+        'with_coupon': int(with_coupon.get(i, 0)),
+        'without_coupon': int(without_coupon.get(i, 0)),
+    } for i in range(7)]
 
 def compute_user_feature_dist(features):
     result = {}

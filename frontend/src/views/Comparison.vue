@@ -126,21 +126,34 @@ const renderRadar = () => {
   if (!d) return
   const chart = ecInit('compare-radar-chart')
   if (!chart) return
+  const dimNames = ['转化率', '购买量', '领券率', '活跃用户', '复购率', '核销率']
+  const rawKeys = ['cvr', 'daily_purchases', 'coupon_rate', 'active_users', 'repurchase_rate', 'redemption_rate']
+  const fmt = {
+    cvr: v => `${v}%`, daily_purchases: v => Number(v).toLocaleString(),
+    coupon_rate: v => `${v}%`, active_users: v => Number(v).toLocaleString(),
+    repurchase_rate: v => `${v}%`, redemption_rate: v => `${v}%`,
+  }
   chart.setOption({
-    tooltip: {},
+    tooltip: {
+      trigger: 'item',
+      formatter: (p) => {
+        const src = p.seriesName === '平销期' ? d.regular : d.promotion
+        const rows = dimNames.map((n, i) => `${n}: <b>${fmt[rawKeys[i]](src?.[rawKeys[i]] ?? 0)}</b>`).join('<br/>')
+        return `<b>${p.name}</b><br/>${rows}`
+      }
+    },
     legend: { data: ['平销期', '促销期'], bottom: 0, itemHeight: 10, textStyle: { fontSize: 11 } },
     radar: {
-      indicator: [
-        { name: '转化率', max: 100 }, { name: '购买量', max: 100 }, { name: '领券率', max: 100 },
-        { name: '活跃用户', max: 100 }, { name: '复购率', max: 100 }, { name: '核销率', max: 100 }
-      ],
-      splitNumber: 4
+      indicator: dimNames.map(n => ({ name: n, max: 100 })),
+      radius: '62%',
+      splitNumber: 5,
+      axisName: { fontSize: 11, color: '#64748b' }
     },
     series: [{
       type: 'radar',
       data: [
-        { name: '平销期',  value: d.radar?.regular   || [60,50,55,65,45,50], areaStyle: { opacity: 0.2 }, itemStyle: { color: '#3b82f6' }, lineStyle: { color: '#3b82f6' } },
-        { name: '促销期',  value: d.radar?.promotion || [80,85,75,90,65,70], areaStyle: { opacity: 0.2 }, itemStyle: { color: '#f43f5e' }, lineStyle: { color: '#f43f5e' } }
+        { name: '平销期',  value: d.radar?.regular   || [0,0,0,0,0,0], areaStyle: { opacity: 0.2 }, itemStyle: { color: '#3b82f6' }, lineStyle: { color: '#3b82f6' } },
+        { name: '促销期',  value: d.radar?.promotion || [0,0,0,0,0,0], areaStyle: { opacity: 0.2 }, itemStyle: { color: '#f43f5e' }, lineStyle: { color: '#f43f5e' } }
       ]
     }]
   })
