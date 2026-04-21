@@ -242,8 +242,11 @@ def get_behavior_sankey(month: int = 4, period: str = "all"):
     获取用户行为路径桑基图数据
     节点：点击用户 / 领券用户 / 仅购买用户 / 券+购买 / 未转化
     """
-    # 优先使用 period 取值 (all/regular/promotion)
-    result = API_RESULT_CACHE.get('behavior_sankey', {}).get(period)
+    # month 参数优先：4/5/6 走按月缓存；否则按 period (all/regular/promotion)
+    if month in (4, 5, 6):
+        result = API_RESULT_CACHE.get('behavior_sankey_by_month', {}).get(month)
+    else:
+        result = API_RESULT_CACHE.get('behavior_sankey', {}).get(period)
     if not result:
         raise HTTPException(status_code=404, detail="该时段的桑基图数据未就绪")
     return result

@@ -104,26 +104,38 @@ def compute_conversion_funnel(df):
         ]
     }
 
-def compute_behavior_sankey(df, period="all"):
-    if period == "regular":
-        period_df = df[df['month'] <= 4]
+def compute_behavior_sankey(df, period="all", month=None):
+    """
+    按 period 或具体 month 切片计算桑基图。
+    切片条件：date 或 date_received 落在区间内（避免只按购买日期漏掉纯领券用户）。
+    """
+    if month is not None:
+        mask = (df['date'].dt.month == month) | (df['date_received'].dt.month == month)
+        period_df = df[mask]
+    elif period == "regular":
+        mask = (df['date'].dt.month <= 4) | (df['date_received'].dt.month <= 4)
+        period_df = df[mask]
     elif period == "promotion":
-        period_df = df[df['month'] >= 5]
+        mask = (df['date'].dt.month >= 5) | (df['date_received'].dt.month >= 5)
+        period_df = df[mask]
     else:
-        period_df = df # 全量
-        
+        period_df = df
+
+    # 节点集合
     clicked = set(period_df[period_df['action'] == 0]['user_id']) if 'action' in period_df.columns else set(period_df['user_id'])
     coupon_users = set(period_df[period_df['date_received'].notna()]['user_id'])
     purchase_users = set(period_df[period_df['date'].notna()]['user_id'])
-    coupon_purchase = set(period_df[(period_df['date'].notna()) & (period_df['coupon_id'].notna())]['user_id'])
+    coupon_purchase_users = set(period_df[(period_df['date'].notna()) & (period_df['coupon_id'].notna())]['user_id'])
+    # "点击用户"作为入口，向下拆分领券 / 未领券两支
+    non_coupon = clicked - coupon_users
 
     links = [
-        {"source": "点击用户", "target": "领券用户",  "value": max(len(clicked & coupon_users), 1)},
-        {"source": "点击用户", "target": "未领券用户", "value": max(len(clicked - coupon_users), 1)},
-        {"source": "领券用户", "target": "券+购买",   "value": max(len(coupon_users & coupon_purchase), 1)},
-        {"source": "领券用户", "target": "券未购买",  "value": max(len(coupon_users - coupon_purchase), 1)},
-        {"source": "未领券用户", "target": "直接购买", "value": max(len(purchase_users - coupon_users), 1)},
-        {"source": "未领券用户", "target": "未购买",   "value": max(len(clicked - purchase_users), 1)}
+        {"source": "点击用户",   "target": "领券用户",   "value": len(clicked & coupon_users)},
+        {"source": "点击用户",   "target": "未领券用户", "value": len(non_coupon)},
+        {"source": "领券用户",   "target": "券+购买",    "value": len(coupon_purchase_users)},
+        {"source": "领券用户",   "target": "券未购买",   "value": len(coupon_users - coupon_purchase_users)},
+        {"source": "未领券用户", "target": "直接购买",   "value": len(non_coupon & purchase_users)},
+        {"source": "未领券用户", "target": "未购买",     "value": len(non_coupon - purchase_users)},
     ]
     nodes = [{"name": n} for n in ["点击用户", "领券用户", "未领券用户", "券+购买", "券未购买", "直接购买", "未购买"]]
     return {"nodes": nodes, "links": links}
@@ -312,7 +324,11 @@ def init_global_cache():
         API_RESULT_CACHE['behavior_sankey'] = {
             "all": compute_behavior_sankey(df, period="all"),
             "regular": compute_behavior_sankey(df, period="regular"),
-            "promotion": compute_behavior_sankey(df, period="promotion")
+            "promotion": compute_behavior_sankey(df, period="promotion"),
+        }
+        # 按月份缓存
+        API_RESULT_CACHE['behavior_sankey_by_month'] = {
+            m: compute_behavior_sankey(df, month=m) for m in [4, 5, 6]
         }
         # 热力图按月缓存
         API_RESULT_CACHE['behavior_heatmap'] = {}
