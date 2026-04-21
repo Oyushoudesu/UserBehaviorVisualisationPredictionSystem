@@ -94,13 +94,19 @@ def get_user_segmentation(month: int = 4):
 # 接口5: 转化漏斗
 # ============================================================================
 @router.get("/conversion-funnel")
-def get_conversion_funnel():
+def get_conversion_funnel(month: int = None, period: str = "all"):
     """
     获取转化漏斗数据
     返回：点击 → 领券 → 购买 各阶段人数
+    month ∈ {4,5,6} 时按月切片，否则按 period (all/regular/promotion)
     """
-    result = API_RESULT_CACHE.get('conversion_funnel')
-    if not result: raise HTTPException(status_code=503, detail="数据准备中")
+    if month in (4, 5, 6):
+        result = API_RESULT_CACHE.get('conversion_funnel_by_month', {}).get(month)
+    else:
+        result = API_RESULT_CACHE.get('conversion_funnel_by_period', {}).get(period) \
+                 or API_RESULT_CACHE.get('conversion_funnel')
+    if not result:
+        raise HTTPException(status_code=503, detail="数据准备中")
     return result
 
 # ============================================================================

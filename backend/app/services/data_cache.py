@@ -72,28 +72,42 @@ def compute_monthly_trend(df):
     monthly_data = []
     for month in range(1, 7):
         month_df = df[df['month'] == month]
-        purchases = month_df['date'].notna().sum()
-        coupons = month_df['date_received'].notna().sum()
-        
+        # 购买数用 action==1 而非 date.notna()：原始数据里 action=0(点击) 也带 date，
+        # 用 date.notna() 会把点击也算成购买，导致 CVR > 100%
         if 'action' in month_df.columns:
-            clicks = (month_df['action'] == 0).sum()
+            clicks = int((month_df['action'] == 0).sum())
+            purchases = int((month_df['action'] == 1).sum())
             cvr = (purchases / clicks * 100) if clicks > 0 else 0
         else:
+            clicks = 0
+            purchases = int(month_df['date'].notna().sum())
             cvr = 0
-            
+        coupons = int(month_df['date_received'].notna().sum())
+
         monthly_data.append({
             "month": month,
-            "purchases": int(purchases),
-            "coupons": int(coupons),
-            "cvr": round(cvr, 2)
+            "purchases": purchases,
+            "coupons": coupons,
+            "cvr": round(cvr, 2),
         })
     return {"data": monthly_data}
 
-def compute_conversion_funnel(df):
+def compute_conversion_funnel(df, period="all", month=None):
+    """按 period 或具体 month 切片计算转化漏斗。"""
+    if month is not None:
+        mask = (df['date'].dt.month == month) | (df['date_received'].dt.month == month)
+        df = df[mask]
+    elif period == "regular":
+        mask = (df['date'].dt.month <= 4) | (df['date_received'].dt.month <= 4)
+        df = df[mask]
+    elif period == "promotion":
+        mask = (df['date'].dt.month >= 5) | (df['date_received'].dt.month >= 5)
+        df = df[mask]
     total_users = df['user_id'].nunique()
     clicked_users = df[df['action'] == 0]['user_id'].nunique() if 'action' in df.columns else total_users
     coupon_users = df[df['date_received'].notna()]['user_id'].nunique()
-    purchased_users = df[df['date'].notna()]['user_id'].nunique()
+    # 购买用户用 action==1，而非 date.notna()（后者会把 action=0 点击也算进来）
+    purchased_users = df[df['action'] == 1]['user_id'].nunique() if 'action' in df.columns else df[df['date'].notna()]['user_id'].nunique()
     
     return {
         "funnel": [
@@ -151,7 +165,8 @@ def compute_hourly_cvr(df):
         np.random.seed(42)
         df['hour'] = np.random.choice(range(24), size=len(df), p=p)
     clicks = df[df['action'] == 0].groupby('hour').size()
-    purchases = df[df['date'].notna()].groupby('hour').size()
+    # 购买用 action==1（date.notna() 会把 action=0 点击也算成购买，导致 CVR>100%）
+    purchases = df[df['action'] == 1].groupby('hour').size()
     result = []
     for h in range(24):
         c = int(clicks.get(h, 0))
@@ -166,7 +181,7 @@ def compute_monthly_retention(df):
         buyers_from = set(df[(df['month'] == m_from) & df['date'].notna()]['user_id'])
         buyers_to   = set(df[(df['month'] == m_to)   & df['date'].notna()]['user_id'])
         retained = len(buyers_from & buyers_to)
-        rate = round(retained / len(buyers_from) * 100, 2) if buyers_from else 0
+        rate = round(retained / len(buyers_from) * 100, 4) if buyers_from else 0
         result.append({
             'label': f'{m_from}月→{m_to}月',
             'base_users': len(buyers_from),
@@ -234,33 +249,31 @@ def compute_behavior_heatmap(df, month):
 
 # 特征相关预计算函数 (基于 user_features_monthX.csv)
 def get_user_segment(row):
-    '''辅助函数：用户分层逻辑'''
-    if row.get('recency', 999) <= 30 and row.get('frequency', 0) >= 10:
+    '''辅助函数：用户分层逻辑（月内尺度）'''
+    if row.get('recency', 999) <= 7 and row.get('frequency', 0) >= 5:
         return '高价值用户'
-    elif row.get('recency', 999) > 30 and row.get('frequency', 0) >= 10:
+    elif row.get('recency', 999) > 7 and row.get('frequency', 0) >= 5:
         return '重要挽留用户'
     elif row.get('is_new_user', 0) == 1:
         return '新用户'
-    # elif row.get('recency', 0) > 90 :
-    #     return '流失用户'
     return '普通用户'
 
 def compute_user_stats(features):
     """提取顶部数据卡片的统计信息"""
+    # recency 现在是月内尺度（0~30 天），churn 阈值改为 >14 天未购买
     return {
         "total_users": len(features),
-        "high_value_users": int(((features.get('recency', 999) <= 30) & (features.get('frequency', 0) >= 10)).sum()),
+        "high_value_users": int(((features.get('recency', 999) <= 7) & (features.get('frequency', 0) >= 5)).sum()),
         "avg_recency": round(float(features['recency'].mean()), 1) if 'recency' in features.columns else 0,
-        "churn_risk_users": int((features.get('recency', 0) > 90).sum()) if 'recency' in features.columns else 0
+        "churn_risk_users": int((features.get('recency', 0) > 14).sum()) if 'recency' in features.columns else 0,
     }
 
 def compute_user_segmentation(features):
-    """计算 RFM 用户分层分布"""
+    """计算 RFM 用户分层分布（月内尺度：recency 0~30）"""
     segments = {
-        "高价值用户": ((features.get('recency', 999) <= 30) & (features.get('frequency', 0) >= 10)).sum(),
-        "重要挽留用户": ((features.get('recency', 999) > 30) & (features.get('frequency', 0) >= 10)).sum(),
+        "高价值用户": ((features.get('recency', 999) <= 7) & (features.get('frequency', 0) >= 5)).sum(),
+        "重要挽留用户": ((features.get('recency', 999) > 7) & (features.get('frequency', 0) >= 5)).sum(),
         "新用户": (features['is_new_user'] == 1).sum() if 'is_new_user' in features.columns else 0,
-#        "流失用户": (features.get('recency', 0) > 90).sum() if 'recency' in features.columns else 0
     }
     return {"segments": [{"name": k, "value": int(v)} for k, v in segments.items()]}
 
@@ -316,6 +329,12 @@ def init_global_cache():
             API_RESULT_CACHE['monthly_stats'] = compute_monthly_trend(df)
         
         API_RESULT_CACHE['conversion_funnel'] = compute_conversion_funnel(df)
+        API_RESULT_CACHE['conversion_funnel_by_period'] = {
+            p: compute_conversion_funnel(df, period=p) for p in ["all", "regular", "promotion"]
+        }
+        API_RESULT_CACHE['conversion_funnel_by_month'] = {
+            m: compute_conversion_funnel(df, month=m) for m in [4, 5, 6]
+        }
         API_RESULT_CACHE['weekday_distribution'] = compute_weekday_distribution(df)
         API_RESULT_CACHE['merchant_ranking'] = compute_merchant_ranking(df)
         API_RESULT_CACHE['hourly_cvr'] = compute_hourly_cvr(df)
